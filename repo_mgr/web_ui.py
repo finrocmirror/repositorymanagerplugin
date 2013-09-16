@@ -1,7 +1,7 @@
 from api import *
 
 from trac.core import *
-from trac.perm import IPermissionRequestor
+from trac.perm import IPermissionRequestor, PermissionError
 from trac.web import IRequestHandler, IRequestFilter
 from trac.web.auth import LoginModule
 from trac.web.chrome import INavigationContributor, ITemplateProvider, add_ctxtnav, add_stylesheet, add_notice, add_warning
@@ -16,54 +16,6 @@ from genshi.builder import tag
 import os
 import re
 
-class BrowserModule(Component):
-    implements(INavigationContributor, IPermissionRequestor, IRequestFilter)
-
-    ### INavigationContributor methods
-    def get_active_navigation_item(self, req):
-        return 'browser'
-
-    def get_navigation_items(self, req):
-        if 'BROWSER_VIEW' in req.perm and 'REPOSITORY_CREATE' in req.perm:
-            yield ('mainnav', 'browser',
-                   tag.a(_('Browse Source'), href=req.href.browser()))
-
-    ### IPermissionRequestor methods
-    def get_permission_actions(self):
-        return ['BROWSER_VIEW', 'REPOSITORY_CREATE', 'REPOSITORY_FORK', 'REPOSITORY_REMOVE']
-
-    ### IRequestFilter methods
-    def pre_process_request(self, req, handler):
-        return handler
-
-    def post_process_request(self, req, template, data, content_type):
-        if 'BROWSER_VIEW' in req.perm and re.match(r'^/browser', req.path_info):
-            trac_rm = TracRepositoryManager(self.env)
-            reponame, repos, path = trac_rm.get_repository_by_path(req.args.get('path', '/'))
-            if repos:
-                if path == '/':
-                    try:
-                        convert_managed_repository(self.env, repos)
-#                        if 'REPOSITORY_FORK' in req.perm and repos.is_forkable:
-#                            add_ctxtnav(req, _('Fork'), req.href.repository('fork', repos.reponame))
-                        if 'REPOSITORY_REMOVE' in req.perm and repos.owner == req.authname:
-                            add_ctxtnav(req, _('Remove'), req.href.repository('remove', repos.reponame))
-                    except:
-                        pass
-
-                    try:
-                        convert_forked_repository(self.env, repos)
-                        add_ctxtnav(req, _('Forked from %(origin)s', origin=repos.origin.reponame), req.href.browser(repos.origin.reponame))
-                    except:
-                        pass
-            else:
-                if 'REPOSITORY_CREATE' in req.perm:
-                    add_ctxtnav(req, _('Create Repository'), req.href.repository('create'))
-
-        return template, data, content_type
-
-    ### Private methods
-
 class RepositoryManagerModule(Component):
     implements(IPermissionRequestor, IRequestHandler, ITemplateProvider)
 
@@ -72,7 +24,7 @@ class RepositoryManagerModule(Component):
 
     ### IPermissionRequestor methods
     def get_permission_actions(self):
-        return ['REPOSITORY_CREATE', 'REPOSITORY_FORK']
+        return ['REPOSITORY_CREATE', 'REPOSITORY_FORK', 'REPOSITORY_MODIFY', 'REPOSITORY_REMOVE']
 
     ### IRequestHandler methods
     def match_request(self, req):
@@ -153,6 +105,7 @@ class RepositoryManagerModule(Component):
             req.redirect(req.href.repository('create'))
 
     def process_create_request(self, req, data):
+        req.perm.require('REPOSITORY_CREATE')
         repository, local_fork, remote_fork = {}, {}, {}
 
         rm = RepositoryManager(self.env);
@@ -202,6 +155,8 @@ class RepositoryManagerModule(Component):
             raise TracError(_('Repository not specified'))
         repository = TracRepositoryManager(self.env).get_repository(reponame)
         convert_managed_repository(self.env, repository)
+        if not ('REPOSITORY_REMOVE' in req.perm and req.authname == repository.owner):
+            raise PermissionError('REPOSITORY_REMOVE', None, self.env)
         if req.args.get('confirm'):
             RepositoryManager(self.env).remove(repository, req.args.get('delete'))
             add_notice(req, _('The repository %(name)s has been removed.', name=reponame))
@@ -212,3 +167,49 @@ class RepositoryManagerModule(Component):
         data.update({'title': 'Remove Repository',
                      'repository': repository,
                      'referer': req.args.get('referer', req.get_header('Referer'))})
+
+class BrowserModule(Component):
+    implements(INavigationContributor, IRequestFilter)
+
+    ### INavigationContributor methods
+    def get_active_navigation_item(self, req):
+        return 'browser'
+
+    def get_navigation_items(self, req):
+        if 'BROWSER_VIEW' in req.perm and 'REPOSITORY_CREATE' in req.perm:
+            yield ('mainnav', 'browser',
+                   tag.a(_('Browse Source'), href=req.href.browser()))
+
+    ### IRequestFilter methods
+    def pre_process_request(self, req, handler):
+        return handler
+
+    def post_process_request(self, req, template, data, content_type):
+        if 'BROWSER_VIEW' in req.perm and re.match(r'^/browser', req.path_info):
+            trac_rm = TracRepositoryManager(self.env)
+            reponame, repos, path = trac_rm.get_repository_by_path(req.args.get('path', '/'))
+            if repos:
+                if path == '/':
+                    try:
+                        convert_managed_repository(self.env, repos)
+#                        if 'REPOSITORY_FORK' in req.perm and repos.is_forkable:
+#                            add_ctxtnav(req, _('Fork'), req.href.repository('fork', repos.reponame))
+                        if 'REPOSITORY_MODIFY' in req.perm:
+                            add_ctxtnav(req, _('Modify'), req.href.repository('modify', repos.reponame))
+                        if 'REPOSITORY_REMOVE' in req.perm and repos.owner == req.authname:
+                            add_ctxtnav(req, _('Remove'), req.href.repository('remove', repos.reponame))
+                    except:
+                        pass
+
+                    try:
+                        convert_forked_repository(self.env, repos)
+                        add_ctxtnav(req, _('Forked from %(origin)s', origin=repos.origin.reponame), req.href.browser(repos.origin.reponame))
+                    except:
+                        pass
+            else:
+                if 'REPOSITORY_CREATE' in req.perm:
+                    add_ctxtnav(req, _('Create Repository'), req.href.repository('create'))
+
+        return template, data, content_type
+
+    ### Private methods
