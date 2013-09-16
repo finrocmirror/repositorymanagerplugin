@@ -1,0 +1,33 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="layout.html" />
+  <head>
+    <title>Repository Manager</title>
+  </head>
+
+  <body>
+    <div id="content">
+
+      <h1>$title</h1>
+
+      <py:choose test="action">
+        <xi:include py:when="'create'" href="repository_create.html" />
+<!--
+        <xi:include py:when="'fork'" href="repository_fork.html" />
+        <xi:include py:when="'modify'" href="repository_modify.html" />
+-->
+        <xi:include py:when="'remove'" href="repository_remove.html" />
+      </py:choose>
+
+      <div id="help">
+        <strong>Note:</strong> See <a href="${href.wiki('RepositoryManager')}">RepositoryManager</a>
+        for help on creating and modifying repositories.
+      </div>
+
+    </div>
+  </body>
+</html>

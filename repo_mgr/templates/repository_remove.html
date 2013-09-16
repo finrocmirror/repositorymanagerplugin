@@ -1,0 +1,16 @@
+<div xmlns="http://www.w3.org/1999/xhtml"
+     xmlns:py="http://genshi.edgewall.org/"
+     xmlns:xi="http://www.w3.org/2001/XInclude"
+     xmlns:i18n="http://genshi.edgewall.org/i18n">
+
+  <form class="addnew" action="${href.repository('remove', repository.reponame)}" method="post">
+    <input type="hidden" name="referer" value="$referer" />
+    <fieldset>
+      <legend>Confirm removal of repository $repository.reponame</legend>
+      <label><input type="checkbox" name="delete" /> Delete content from disk (cannot be undone)</label>
+      <input type="submit" name="confirm" value="${_('Remove Repository')}" />
+      <input type="submit" name="cancel" value="${_('Cancel')}" />
+    </fieldset>
+  </form>
+
+</div>

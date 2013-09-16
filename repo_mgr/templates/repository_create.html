@@ -1,0 +1,71 @@
+<div xmlns="http://www.w3.org/1999/xhtml"
+     xmlns:py="http://genshi.edgewall.org/"
+     xmlns:xi="http://www.w3.org/2001/XInclude"
+     xmlns:i18n="http://genshi.edgewall.org/i18n">
+
+  <h2>New Repository</h2>
+
+  <form class="addnew" action="${href.repository('create')}" method="post">
+    <fieldset>
+      <legend>Create New Repository:</legend>
+      <label>Name: <input type="text" name="name" value="$repository.name"/></label>
+      <label>Type:
+        <select size="1" name="type">
+          <option py:for="type in supported_repository_types" value="$type" selected="${type == repository.type or None}">$type</option>
+        </select>
+      </label>
+      <label>Directory: <input type="text" name="directory" value="$repository.directory" /></label>
+      <input type="submit" name="create" value="${_('Create Repository')}" />
+      <p class="help">
+        Create a new empty repository from scratch.
+      </p>
+    </fieldset>
+  </form>
+
+  <h2>Fork Repository</h2>
+
+  <py:if test="forkable_repositories">
+    <form class="addnew" action="${href.repository('create')}" method="post">
+      <fieldset>
+        <legend>Fork Local Repository:</legend>
+        <div>
+          <label>Origin:
+            <select size="1" name="origin">
+              <option py:for="repo in forkable_repositories" value="$repo" selected="${repo == local_fork.origin or None}">$repo</option>
+            </select>
+          </label>
+        </div>
+        <label>Name: <input type="text" name="name" value="$local_fork.name" /></label>
+        <label>Directory: <input type="text" name="directory" value="$local_fork.directory" /></label>
+        <input type="submit" name="fork_local" value="${_('Create Forked Repository')}" />
+        <p class="help">
+          Fork an existing repository within this Trac instance.
+        </p>
+      </fieldset>
+    </form>
+  </py:if>
+
+<!--
+  <form class="addnew" action="${href.repository('create')}" method="post">
+    <fieldset>
+      <legend>Fork Remote Repository:</legend>
+      <div>
+        <label>Source URL: <input type="text" name="url" /></label>
+        <label>Type:
+          <select size="1" name="type">
+            <option py:for="type in forkable_repository_types" value="$type" selected="${type == selected_fork_type or None}">$type</option>
+          </select>
+        </label>
+        <label>Username: <input type="text" name="username" /></label>
+        <label>Password: <input type="password" name="password" /></label>
+      </div>
+      <label>Name: <input type="text" name="name" /></label>
+      <label>Directory: <input type="text" name="directory" /></label>
+      <input type="submit" name="fork_remote" value="${_('Create Repository')}" />
+      <p class="help">
+        Fork an existing repository from an external ressource. Will appear as new repository within this Trac instance, but with initial content and history.
+      </p>
+    </fieldset>
+  </form>
+-->
+</div>
