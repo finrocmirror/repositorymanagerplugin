@@ -44,6 +44,8 @@ class RepositoryManagerModule(Component):
 
         if action == 'create':
             self.process_create_request(req, data)
+        elif action == 'modify':
+            self.process_modify_request(req, data)
         elif action == 'remove':
             self.process_remove_request(req, data)
 
@@ -121,7 +123,7 @@ class RepositoryManagerModule(Component):
                           'owner': req.authname}
             self.create(req, repository, rm.create)
 
-        if req.args.get('fork_local'):
+        elif req.args.get('fork_local'):
             local_fork = {'name': req.args.get('name'),
                           'directory': normalize_whitespace(req.args.get('directory', req.args.get('name'))),
                           'owner': req.authname,
@@ -133,7 +135,7 @@ class RepositoryManagerModule(Component):
                 local_fork.update({'type': origin.type})
                 self.create(req, local_fork, rm.fork_local)
 
-        if req.args.get('fork_remote'):
+        elif req.args.get('fork_remote'):
             remote_fork = {'name': req.args.get('name'),
                            'type': req.args.get('type'),
                            'directory': normalize_whitespace(req.args.get('directory', req.args.get('name'))),
@@ -148,22 +150,54 @@ class RepositoryManagerModule(Component):
                      'local_fork': local_fork,
                      'remote_fork': remote_fork})
 
-    def process_remove_request(self, req, data):
-        reponame = req.args.get('reponame')
-        if not reponame:
+    def check_repository(self, req, name, permission):
+        if not name:
             raise TracError(_('Repository not specified'))
 
         rm = RepositoryManager(self.env)
-        repository = rm.get_repository(reponame, True)
+        repository = rm.get_repository(name, True)
+        if not repository:
+            raise TracError(_('Repository "%(name)s" does not exist.', name=name))
 
-        if not ('REPOSITORY_REMOVE' in req.perm and req.authname == repository.owner):
-            raise PermissionError('REPOSITORY_REMOVE', None, self.env)
+        if not (permission in req.perm and req.authname == repository.owner):
+            raise PermissionError(permission, None, self.env)
+
+        return repository
+
+    def process_modify_request(self, req, data):
+        repository = self.check_repository(req, req.args.get('reponame'), 'REPOSITORY_MODIFY')
+
+        base_directory = self.get_base_directory(repository.type)
+        prefix_length = len(base_directory)
+        if prefix_length > 0:
+            prefix_length += 1
+
+        new_data = {'name': req.args.get('name', repository.reponame),
+                    'type': repository.type,
+                    'directory': normalize_whitespace(req.args.get('directory', repository.directory[prefix_length:]))}
+
+        if req.args.get('modify'):
+            if self.check_and_update_repository(req, new_data):
+                RepositoryManager(self.env).modify(repository, new_data)
+                link = tag.a(repository.reponame, href=req.href.browser(new_data['name']))
+                add_notice(req, tag_('The repository "%(link)s" has been modified.', link=link))
+                req.redirect(req.href.repository())
+        elif req.args.get('cancel'):
+            LoginModule(self.env)._redirect_back(req)
+
+        data.update({'title': 'Modify Repository',
+                     'repository': repository,
+                     'new_data': new_data,
+                     'referer': req.args.get('referer', req.get_header('Referer'))})
+
+    def process_remove_request(self, req, data):
+        repository = self.check_repository(req, req.args.get('reponame'), 'REPOSITORY_REMOVE')
 
         if req.args.get('confirm'):
-            rm.remove(repository, req.args.get('delete'))
-            add_notice(req, _('The repository %(name)s has been removed.', name=reponame))
+            RepositoryManager(self.env).remove(repository, req.args.get('delete'))
+            add_notice(req, _('The repository "%(name)s" has been removed.', name=repository.reponame))
             req.redirect(req.href.repository())
-        if req.args.get('cancel'):
+        elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
 
         data.update({'title': 'Remove Repository',

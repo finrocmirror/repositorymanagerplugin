@@ -1,0 +1,16 @@
+<div xmlns="http://www.w3.org/1999/xhtml"
+     xmlns:py="http://genshi.edgewall.org/"
+     xmlns:xi="http://www.w3.org/2001/XInclude"
+     xmlns:i18n="http://genshi.edgewall.org/i18n">
+
+  <form class="addnew" action="${href.repository('modify', repository.reponame)}" method="post">
+    <fieldset>
+      <legend>Modification of repository $repository.reponame</legend>
+      <label>Name: <input type="text" name="name" value="$new_data.name" /></label>
+      <label>Directory: <input type="text" name="directory" value="$new_data.directory" /></label>
+      <input type="submit" name="modify" value="${_('Modify Repository')}" />
+      <input type="submit" name="cancel" value="${_('Cancel')}" />
+    </fieldset>
+  </form>
+
+</div>

@@ -120,6 +120,16 @@ class RepositoryManager(Component):
             self.manager.reload_repositories()
         self.manager.get_repository(repository['name']).sync(None, True)
 
+    def modify(self, repository, data):
+        convert_managed_repository(self.env, repository)
+        if repository.directory != data['directory']:
+            shutil.move(repository.directory, data['directory'])
+        with self.env.db_transaction as db:
+            db.executemany('UPDATE repository SET value = %s WHERE id = %s AND name = %s',
+                           [(data['name'], repository.id, 'name'),
+                            (data['directory'], repository.id, 'dir')])
+            self.manager.reload_repositories()
+
     def remove(self, repository, delete):
         convert_managed_repository(self.env, repository)
         with self.env.db_transaction as db:
