@@ -5,7 +5,7 @@ from trac.perm import IPermissionRequestor, PermissionError
 from trac.web import IRequestHandler, IRequestFilter
 from trac.web.auth import LoginModule
 from trac.web.chrome import INavigationContributor, ITemplateProvider, add_ctxtnav, add_stylesheet, add_notice, add_warning
-from trac.versioncontrol.api import RepositoryManager as TracRepositoryManager
+from trac.versioncontrol.admin import RepositoryAdminPanel
 from trac.util import is_path_below
 from trac.util.translation import _, tag_
 from trac.util.text import normalize_whitespace
@@ -61,17 +61,20 @@ class RepositoryManagerModule(Component):
         return [('hw', resource_filename(__name__, 'htdocs'))]
 
     ### Private methods
+    def get_base_directory(self, type):
+        base = os.path.join(self.env.path, self.base_dir)
+        if self.use_type_subdirs:
+            return os.path.join(base, type)
+        return base
+
     def check_and_update_repository(self, req, repository):
         """Check if a repository is valid, does not already exist, update the dict and add a warning message otherwise."""
         if not repository['directory']:
             add_warning(req, _('The directory is missing.'))
             return False
 
-        base = os.path.join(self.env.path, self.base_dir)
-        if self.use_type_subdirs:
-            base = os.path.join(base, repository['type'])
-
-        directory = os.path.join(base, repository['directory'])
+        base_directory = self.get_base_directory(repository['type'])
+        directory = os.path.join(base_directory, repository['directory'])
 
         if os.path.lexists(directory):
             add_warning(req, _('Directory "%(name)s" already exists',
@@ -87,7 +90,8 @@ class RepositoryManagerModule(Component):
                                '%(dirs)s', dirs=', '.join(prefixes)))
             return False
 
-        if TracRepositoryManager(self.env).get_repository(repository['name']):
+        rm = RepositoryManager(self.env)
+        if rm.get_repository(repository['name']):
             add_warning(req, _('Repository "%(name)s" already exists',
                                name=repository['name']))
             return False
@@ -122,11 +126,11 @@ class RepositoryManagerModule(Component):
                           'directory': normalize_whitespace(req.args.get('directory', req.args.get('name'))),
                           'owner': req.authname,
                           'origin': req.args.get('origin')}
-            origin = TracRepositoryManager(self.env).get_all_repositories().get(local_fork['origin'])
+            origin = rm.get_repository(local_fork['origin'], True)
             if not origin:
                 add_warning(req, 'Origin does not exist.')
             else:
-                local_fork.update({'type': origin['type']})
+                local_fork.update({'type': origin.type})
                 self.create(req, local_fork, rm.fork_local)
 
         if req.args.get('fork_remote'):
@@ -136,15 +140,10 @@ class RepositoryManagerModule(Component):
                            'owner': req.authname}
             self.create(req, remote_fork, rm.fork_remote)
 
-        forkable_types = rm.get_forkable_types()
-        repositories = TracRepositoryManager(self.env).get_all_repositories()
-        forkable_repositories = (repositories[repo]['name'] for repo in repositories
-                                 if repositories[repo]['type'] in forkable_types)
-
         data.update({'title': 'Create Repository',
                      'supported_repository_types': rm.get_supported_types(),
-                     'forkable_repository_types': forkable_types,
-                     'forkable_repositories': forkable_repositories,
+                     'forkable_repository_types': rm.get_forkable_types(),
+                     'forkable_repositories': rm.get_forkable_repositories(),
                      'repository': repository,
                      'local_fork': local_fork,
                      'remote_fork': remote_fork})
@@ -153,12 +152,15 @@ class RepositoryManagerModule(Component):
         reponame = req.args.get('reponame')
         if not reponame:
             raise TracError(_('Repository not specified'))
-        repository = TracRepositoryManager(self.env).get_repository(reponame)
-        convert_managed_repository(self.env, repository)
+
+        rm = RepositoryManager(self.env)
+        repository = rm.get_repository(reponame, True)
+
         if not ('REPOSITORY_REMOVE' in req.perm and req.authname == repository.owner):
             raise PermissionError('REPOSITORY_REMOVE', None, self.env)
+
         if req.args.get('confirm'):
-            RepositoryManager(self.env).remove(repository, req.args.get('delete'))
+            rm.remove(repository, req.args.get('delete'))
             add_notice(req, _('The repository %(name)s has been removed.', name=reponame))
             req.redirect(req.href.repository())
         if req.args.get('cancel'):
@@ -186,8 +188,8 @@ class BrowserModule(Component):
 
     def post_process_request(self, req, template, data, content_type):
         if 'BROWSER_VIEW' in req.perm and re.match(r'^/browser', req.path_info):
-            trac_rm = TracRepositoryManager(self.env)
-            reponame, repos, path = trac_rm.get_repository_by_path(req.args.get('path', '/'))
+            rm = RepositoryManager(self.env)
+            reponame, repos, path = rm.get_repository_by_path(req.args.get('path', '/'))
             if repos:
                 if path == '/':
                     try:

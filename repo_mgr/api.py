@@ -44,11 +44,16 @@ class RepositoryManager(Component):
 
     connectors = ExtensionPoint(IAdministrativeRepositoryConnector)
 
+    manager = None
+
+    def __init__(self):
+        self.manager = TracRepositoryManager(self.env)
+
     def get_supported_types(self):
         types = set(repo_type for connector in self.connectors
                     for (repo_type, priority) in connector.get_supported_types() or []
                     if priority >= 0)
-        return list(types & set(TracRepositoryManager(self.env).get_supported_types()))
+        return list(types & set(self.manager.get_supported_types()))
 
     def get_forkable_types(self):
         return list(repo_type for repo_type in self.get_supported_types() if self.can_fork(repo_type))
@@ -56,9 +61,23 @@ class RepositoryManager(Component):
     def can_fork(self, repository_type):
         return self.get_repository_connector(repository_type).can_fork(repository_type)
 
+    def get_forkable_repositories(self):
+        repositories = self.manager.get_all_repositories()
+        for key in repositories:
+            if repositories[key]['type'] in self.get_forkable_types():
+                yield repositories[key]['name']
+
+    def get_repository(self, name, cast_to_managed=False):
+        repository = self.manager.get_repository(name)
+        if repository and cast_to_managed:
+            convert_managed_repository(self.env, repository)
+        return repository
+
+    def get_repository_by_path(self, path):
+        return self.manager.get_repository_by_path(path)
+
     def create(self, repository):
-        rm = TracRepositoryManager(self.env)
-        if rm.get_repository(repository['name']) or os.path.lexists(repository['directory']):
+        if self.get_repository(repository['name']) or os.path.lexists(repository['directory']):
             raise TracError(_('Repository or directory already exists'))
 
         self.prepare_base_directory(repository['directory'])
@@ -68,50 +87,46 @@ class RepositoryManager(Component):
         self.adjust_modes(repository['directory'])
 
         with self.env.db_transaction as db:
-            repository['id'] = rm.get_repository_id(repository['name'])
+            repoid = self.manager.get_repository_id(repository['name'])
             db.executemany('INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)',
-                           [(repository['id'], 'dir', repository['directory']),
-                            (repository['id'], 'type', repository['type']),
-                            (repository['id'], 'owner', repository['owner'])])
-            rm.reload_repositories()
-        rm.get_repository(repository['name']).sync(None, True)
+                           [(repoid, 'dir', repository['directory']),
+                            (repoid, 'type', repository['type']),
+                            (repoid, 'owner', repository['owner'])])
+            self.manager.reload_repositories()
+        self.manager.get_repository(repository['name']).sync(None, True)
 
     def fork_local(self, repository):
-        rm = TracRepositoryManager(self.env)
-        if rm.get_repository(repository['name']) or os.path.lexists(repository['directory']):
+        if self.get_repository(repository['name']) or os.path.lexists(repository['directory']):
             raise TracError(_('Repository or directory already exists.'))
 
-        origin = rm.get_all_repositories().get(repository['origin'])
+        origin = self.get_repository(repository['origin'])
         if not origin:
             raise TracError(_('Origin for local fork does not exist.'))
-        if origin['type'] != repository['type']:
-            raise TracError(_('Fork of local repository must have same type as origin'))
-        repository.update({'origin_url': 'file://' + origin['dir']})
+        if origin.type != repository['type']:
+            raise TracError(_('Fork of local repository must have same type as origin.'))
+        repository.update({'origin_url': 'file://' + origin.directory})
 
         self.get_repository_connector(repository['type']).fork(repository)
 
         self.adjust_modes(repository['directory'])
 
         with self.env.db_transaction as db:
-            repository['id'] = rm.get_repository_id(repository['name'])
+            repoid = self.manager.get_repository_id(repository['name'])
             db.executemany('INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)',
-                           [(repository['id'], 'dir', repository['directory']),
-                            (repository['id'], 'type', repository['type']),
-                            (repository['id'], 'owner', repository['owner']),
-                            (repository['id'], 'origin', origin['id'])])
-            rm.reload_repositories()
-        rm.get_repository(repository['name']).sync(None, True)
+                           [(repoid, 'dir', repository['directory']),
+                            (repoid, 'type', repository['type']),
+                            (repoid, 'owner', repository['owner']),
+                            (repoid, 'origin', origin.id)])
+            self.manager.reload_repositories()
+        self.manager.get_repository(repository['name']).sync(None, True)
 
     def remove(self, repository, delete):
         convert_managed_repository(self.env, repository)
-        rm = TracRepositoryManager(self.env)
-        repoid = rm.get_repository_id(repository.reponame)
-        directory = rm.get_all_repositories().get(repository.reponame).get('dir')
         with self.env.db_transaction as db:
-            db('DELETE FROM repository WHERE id = %d' % repoid)
+            db('DELETE FROM repository WHERE id = %d' % repository.id)
+            self.manager.reload_repositories()
         if delete:
-            shutil.rmtree(directory)
-        rm.reload_repositories()
+            shutil.rmtree(repository.directory)
 
     ### Private methods
     def get_repository_connector(self, repository_type):
@@ -143,30 +158,34 @@ class RepositoryManager(Component):
             raise TracError(_('Failed to adjust file modes: ' + str(e)))
 
 
-def convert_managed_repository(env, repos):
+def convert_managed_repository(env, repository):
 
-    class ManagedRepository(repos.__class__):
+    class ManagedRepository(repository.__class__):
 
+        id = None
         owner = None
+        type = None
         is_forkable = None
+        directory = None
 
-    if repos.__class__ is not ManagedRepository:
-        repos.__class__ = ManagedRepository
+    if repository.__class__ is not ManagedRepository:
+        repository.__class__ = ManagedRepository
         trac_rm = TracRepositoryManager(env)
-        repoid = trac_rm.get_repository_id(repos.reponame)
-        repos.owner = None
+        repository.id = trac_rm.get_repository_id(repository.reponame)
         with env.db_transaction as db:
-            result = db("SELECT value FROM repository WHERE name = 'owner' AND id = %d" % repoid)
+            result = db("SELECT value FROM repository WHERE name = 'owner' AND id = %d" % repository.id)
             if not result:
                 raise TracError(_('Not a managed repository'))
+            repository.owner = result[0][0]
 
-            repos.owner = result[0][0]
-        repotype = trac_rm.get_all_repositories().get(repos.reponame)['type']
-        repos.is_forkable = repotype in RepositoryManager(env).get_forkable_types()
+        info = trac_rm.get_all_repositories().get(repository.reponame)
+        repository.type = info['type']
+        repository.is_forkable = repository.type in RepositoryManager(env).get_forkable_types()
+        repository.directory = info['dir']
 
-def convert_forked_repository(env, repos):
+def convert_forked_repository(env, repository):
 
-    class ForkedRepository(repos.__class__):
+    class ForkedRepository(repository.__class__):
 
         origin = None
 
@@ -187,21 +206,16 @@ def convert_forked_repository(env, repos):
 
             return None
 
-    convert_managed_repository(repos)
-    if repos.__class__ is not ForkedRepository:
-        repos.__class__ = ForkedRepository
-        rm = TracRepositoryManager(env)
-        repoid = rm.get_repository_id(repos.reponame)
-        repos.origin = None
+    convert_managed_repository(repository)
+    if repository.__class__ is not ForkedRepository:
+        repository.__class__ = ForkedRepository
         with env.db_transaction as db:
-            result = db("SELECT value FROM repository WHERE name = 'name' AND id = (SELECT value FROM repository WHERE name = 'origin' AND id = %d)" % repoid)
-            env.log.debug('result:')
-            env.log.debug(result)
+            result = db("SELECT value FROM repository WHERE name = 'name' AND id = (SELECT value FROM repository WHERE name = 'origin' AND id = %d)" % repository.id)
             if not result:
                 raise TracError(_('Not a forked repository'))
 
-            repos.origin = rm.get_repository(result[0][0])
-            if repos.origin is None:
+            repository.origin = TracRepositoryManager(env).get_repository(result[0][0])
+            if repository.origin is None:
                 raise TracError(_('Origin of previously forked repository does not exist anymore'))
 
-    assert repos.origin
+    assert repository.origin
