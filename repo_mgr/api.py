@@ -67,9 +67,9 @@ class RepositoryManager(Component):
             if repositories[key]['type'] in self.get_forkable_types():
                 yield repositories[key]['name']
 
-    def get_repository(self, name, cast_to_managed=False):
+    def get_repository(self, name, convert_to_managed=False):
         repository = self.manager.get_repository(name)
-        if repository and cast_to_managed:
+        if repository and convert_to_managed:
             convert_managed_repository(self.env, repository)
         return repository
 
@@ -216,7 +216,7 @@ def convert_forked_repository(env, repository):
 
             return None
 
-    convert_managed_repository(repository)
+    convert_managed_repository(env, repository)
     if repository.__class__ is not ForkedRepository:
         repository.__class__ = ForkedRepository
         with env.db_transaction as db:

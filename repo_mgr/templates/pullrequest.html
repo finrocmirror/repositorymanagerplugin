@@ -126,14 +126,14 @@
                                         and (can_append or can_modify or can_edit or can_create)">
 
       <div class="trac-topnav" py:if="(ticket.exists or preview_mode) and has_property_editor">
-        <a href="#modify" title="Go to the ticket editor">Modify</a> &darr;
+        <a href="#modify" title="Go to the pull request editor">Modify</a> &darr;
       </div>
       <h1 py:if="not ticket.exists">
         Create New Pull Request <span py:if="preview_mode and ticket.type" class="status">(${ticket.type})</span>
       </h1>
 
       <py:if test="ticket.exists">
-        <xi:include href="ticket_box.html" py:with="preview_mode = change_preview.fields"/>
+        <xi:include href="pullrequest_box.html" py:with="preview_mode = change_preview.fields"/>
 
         <!--! do not show attachments for old versions of this ticket or for new tickets -->
         <py:if test="not version and version != 0 and ticket.exists">
@@ -177,7 +177,7 @@
 
       <form py:if="has_property_editor" method="post" id="propertyform"
             action="${href.ticket(ticket.id) + '#trac-add-comment' if ticket.exists
-                      else href.newticket() + '#ticket'}">
+                      else href.newpullrequest(pr_srcrepo.reponame) + '#ticket'}">
         <!--! Add comment -->
         <div py:if="ticket.exists and can_append" id="trac-add-comment" class="field">
           <h3 class="foldable" id="edit">Add Comment</h3>
@@ -219,6 +219,32 @@ ${comment}</textarea>
                     <input type="text" id="field-summary" name="field_summary"
                            class="${'trac-focus' if not ticket.exists and not preview_mode else None}"
                            value="$ticket.summary" size="70" />
+                  </td>
+                </tr>
+                <tr>
+                  <th><label for="field-srcrev">From:</label></th>
+                  <td class="fullrow" colspan="3">
+                    <input type="hidden" id="field-pr-srcrepo" name="field_pr_srcrepo" value="$pr_srcrepo.reponame" />
+                    <py:choose>
+                      <py:when test="not ticket.exists or len(pr_srcrev_list) == 1">
+                        <a title="Show in browser" href="${href.browser(pr_srcrepo.reponame, rev=pr_srcrev)}">$pr_srcrepo.reponame @ ${pr_srcrepo.display_rev(pr_srcrev)}</a>
+                        <input type="hidden" id="field-pr-srcrev" name="field_pr_srcrev" value="$pr_srcrev" />
+                      </py:when>
+                      <py:otherwise>
+                        <a title="Show in browser" href="${href.browser(pr_srcrepo.reponame)}">$pr_srcrepo.reponame @ </a>
+                        <select id="field-pr-srcrev" name="field_pr_srcrev">
+                          <option py:for="rev in pr_srcrev_list" value="$rev" selected="${rev == pr_srcrev or None}">${pr_srcrepo.display_rev(rev)}</option>
+                        </select>
+                      </py:otherwise>
+                    </py:choose>
+                  </td>
+                </tr>
+                <tr>
+                <th>To:</th>
+                  <td cass="fullrow" colspan="3">
+                    <input type="hidden" id="field-pr-dstrepo" name="field_pr_dstrepo" value="$pr_dstrepo.reponame" />
+                    <input type="hidden" id="field-pr-dstrev" name="field_pr_dstrev" value="$dstrev" />
+                    <a title="Show in browser" href="${href.browser(pr_dstrepo.reponame, rev=pr_dstrev)}">$pr_dstrepo.reponame @ ${pr_dstrepo.display_rev(dstrev)}</a>
                   </td>
                 </tr>
                 <py:if test="only_for_admin">
@@ -368,13 +394,13 @@ ${value}</textarea>
         <p py:if="not ticket.exists and 'ATTACHMENT_CREATE' in perm(ticket.resource.child('attachment'))">
           <label>
             <input type="checkbox" name="attachment" checked="${'attachment' in req.args or None}" />
-            I have files to attach to this ticket
+            I have files to attach to this pull request
           </label>
         </p>
 
         <div py:if="ticket.exists" class="trac-nav">
           <a href="#attachments" id="trac-up-attachments" title="Go to the list of attachments">Attachments</a> &uarr;
-          <a href="#content" id="trac-up-view" title="View the ticket description">Description</a> &uarr;
+          <a href="#content" id="trac-up-view" title="View the pull request description">Description</a> &uarr;
         </div>
         <div class="buttons">
           <py:if test="ticket.exists">
@@ -383,12 +409,12 @@ ${value}</textarea>
             <input type="hidden" name="replyto" value="${replyto}" />
           </py:if>
           <input type="submit" name="preview" value="${_('Preview')}" accesskey="r" />&nbsp;
-          <input type="submit" name="submit" value="${_('Submit changes') if ticket.exists else _('Create ticket')}" />
+          <input type="submit" name="submit" value="${_('Submit changes') if ticket.exists else _('Create pull request')}" />
         </div>
 
       </form>
 
-      <xi:include href="ticket_box.html" py:if="not ticket.exists"
+      <xi:include href="pullrequest_box.html" py:if="not ticket.exists"
                   py:with="hide = not preview_mode; preview_mode = True"/>
 
       <div id="help" i18n:msg="">

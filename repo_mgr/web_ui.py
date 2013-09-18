@@ -223,23 +223,23 @@ class BrowserModule(Component):
     def post_process_request(self, req, template, data, content_type):
         if 'BROWSER_VIEW' in req.perm and re.match(r'^/browser', req.path_info):
             rm = RepositoryManager(self.env)
-            reponame, repos, path = rm.get_repository_by_path(req.args.get('path', '/'))
-            if repos:
+            reponame, repository, path = rm.get_repository_by_path(req.args.get('path', '/'))
+            if repository:
                 if path == '/':
                     try:
-                        convert_managed_repository(self.env, repos)
+                        convert_managed_repository(self.env, repository)
 #                        if 'REPOSITORY_FORK' in req.perm and repos.is_forkable:
 #                            add_ctxtnav(req, _('Fork'), req.href.repository('fork', repos.reponame))
                         if 'REPOSITORY_MODIFY' in req.perm:
-                            add_ctxtnav(req, _('Modify'), req.href.repository('modify', repos.reponame))
+                            add_ctxtnav(req, _('Modify'), req.href.repository('modify', repository.reponame))
                         if 'REPOSITORY_REMOVE' in req.perm and repos.owner == req.authname:
-                            add_ctxtnav(req, _('Remove'), req.href.repository('remove', repos.reponame))
+                            add_ctxtnav(req, _('Remove'), req.href.repository('remove', repository.reponame))
                     except:
                         pass
 
                     try:
-                        convert_forked_repository(self.env, repos)
-                        add_ctxtnav(req, _('Forked from %(origin)s', origin=repos.origin.reponame), req.href.browser(repos.origin.reponame))
+                        convert_forked_repository(self.env, repository)
+                        add_ctxtnav(req, _('Forked from %(origin)s', origin=repository.origin.reponame), req.href.browser(repository.origin.reponame))
                     except:
                         pass
             else:
