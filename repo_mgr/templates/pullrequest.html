@@ -70,6 +70,8 @@
           var items = $(reply);
           // Update ticket box
           $("#ticket").replaceWith(items.filter('#ticket'));
+          // Update diff
+          $("#diff").replaceWith(items.filter('#diff'));
           // Unthread, unrevert and update changelog
           if (!$('#trac-comments-oldest').checked())
             $('#trac-comments-oldest').click().change();
@@ -423,5 +425,10 @@ ${value}</textarea>
         pull requests.
       </div>
     </div>
+
+    <br />
+    <xi:include href="diff.html"
+      py:with="changes = diff_changes"/>
+
   </body>
 </html>

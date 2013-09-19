@@ -19,4 +19,5 @@ Render data relevant to automatic ticket preview.
   <input type="hidden" name="view_time" value="${to_utimestamp(ticket['changetime'])}"/>
   <div id="preview"><xi:include py:if="change_preview.fields or change_preview.comment"
                                 href="ticket_change.html" py:with="change = change_preview; preview = True"/></div>
+  <xi:include href="diff.html" py:with="changes = diff_changes"/>
 </html>

@@ -3,7 +3,9 @@ from ..api import *
 from trac.core import *
 from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler, IRequestFilter
-from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_notice, add_warning
+from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_notice, add_warning, add_script, add_stylesheet
+from trac.versioncontrol.web_ui import ChangesetModule
+from trac.versioncontrol.diff import get_diff_options
 from trac.resource import ResourceNotFound
 from trac.ticket.web_ui import TicketModule
 from trac.ticket.model import Type
@@ -57,7 +59,7 @@ class PullrequestModule(Component):
                                   if not re.match(r'^pr_', field['name']))
 
             if ticket['type'] == 'pull request':
-                data['fields'] = list(self.filter_data_ticket_types(data['fields'], True))
+                data['fields'] = list(self.filter_ticket_types(data['fields'], True))
 
                 repository = data.get('pr_srcrepo')
                 if not repository:
@@ -78,11 +80,16 @@ class PullrequestModule(Component):
                              'pr_dstrepo': repository.origin,
                              'pr_dstrev': repository.get_youngest_common_ancestor(srcrev)})
 
+                self.render_diff_html(req, data)
+                add_script(req, 'common/js/diff.js')
+                add_stylesheet(req, 'common/css/diff.css')
+                add_stylesheet(req, 'common/css/code.css')
+
                 if template in ['ticket.html', 'ticket_box.html', 'ticket_preview.html']:
                     template = template.replace('ticket', 'pullrequest', 1)
 
             else:
-                data['fields'] = list(self.filter_data_ticket_types(data['fields'], False))
+                data['fields'] = list(self.filter_ticket_types(data['fields'], False))
 
         return template, data, content_type
 
@@ -119,7 +126,8 @@ class PullrequestModule(Component):
         from pkg_resources import resource_filename
         return [('hw', resource_filename(__name__, 'htdocs'))]
 
-    def filter_data_ticket_types(self, fields, only_pull_request):
+    ### Private methods
+    def filter_ticket_types(self, fields, only_pull_request):
         for field in fields:
             if field['name'] == 'type':
                 if only_pull_request:
@@ -129,6 +137,30 @@ class PullrequestModule(Component):
                     field['options'] = [option for option in field['options']
                                         if option != 'pull request']
             yield field
+
+    def render_diff_html(self, req, data):
+        style, options, diff = get_diff_options(req)
+
+        cm = ChangesetModule(self.env)
+        diff_data = {}
+        diff_data.update({'old_path': '',
+                          'old_rev': data['pr_dstrev'],
+                          'new_path': '',
+                          'new_rev': data['pr_srcrev'],
+                          'repos': data['pr_srcrepo'],
+                          'reponame': data['pr_srcrepo'].reponame,
+                          'diff': diff,
+                          'wiki_format_messages': cm.wiki_format_messages})
+
+        cm._render_html(req, data['pr_srcrepo'], False, True, False, diff_data)
+
+        for key in diff_data:
+            diff_key = key
+            if key in ['changes']:
+                diff_key = 'diff_' + key
+            if diff_key in data:
+                raise TracError('Key %(key)s collides in data', diff_key)
+            data[diff_key] = diff_data[key]
 
 class BrowserModule(Component):
     implements(IRequestFilter)
@@ -150,5 +182,4 @@ class BrowserModule(Component):
                     pass
         return template, data, content_type
 
-    ### Private methods
     ### Private methods
