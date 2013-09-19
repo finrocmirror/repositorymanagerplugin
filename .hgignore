@@ -1,0 +1,16 @@
+syntax: glob
+
+# build artifacts
+*.pyc
+dist
+build
+*.egg-info
+
+
+# emacs
+*~
+
+# eclipse
+.project
+.pydevproject
+.settings
