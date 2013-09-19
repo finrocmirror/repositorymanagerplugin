@@ -10,17 +10,18 @@ class MercurialConnector(Component):
     def get_supported_types(self):
         yield ('hg', 0)
 
-    def can_fork(self, repository_type):
+    def can_fork(self, type):
         return True
 
-    def create(self, repository):
+    def create(self, repo):
         try:
-            hglib.init(repository['directory'])
+            hglib.init(repo['dir'])
         except Exception, e:
-            raise TracError(_('Failed to initialize repository: ' + str(e)))
+            raise TracError(_("Failed to initialize repository: ") + str(e))
 
-    def fork(self, repository):
+    def fork(self, repo):
         try:
-            hglib.clone(repository['origin_url'], repository['directory'], updaterev='null', pull=True)
+            hglib.clone(repo['origin_url'], repo['dir'],
+                        updaterev='null', pull=True)
         except Exception, e:
-            raise TracError(_('Failed to clone repository: ' + str(e)))
+            raise TracError(_("Failed to clone repository: ") + str(e))
