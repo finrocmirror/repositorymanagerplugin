@@ -43,7 +43,18 @@ class IAdministrativeRepositoryConnector(Interface):
         """Fork from `origin_url` in the given dict."""
 
 class RepositoryManager(Component):
-    """
+    """Adds creation, modification and deletion of repositories.
+
+    This class extends Trac's `RepositoryManager` and adds some
+    capabilities that allow users to create and manage repositories.
+    The original `RepositoryManager` *just* allows adding and removing
+    existing repositories from Trac's database, which means that still
+    someone must do some shell work on the server.
+
+    To work nicely together with manually created and added repositories
+    a new `ManagedRepository` class is used to mark the ones that can be
+    handled by this module. It also implements forking, if the connector
+    supports that, which creates instances of `ForkedRepository`.
     """
 
     connectors = ExtensionPoint(IAdministrativeRepositoryConnector)
@@ -54,34 +65,55 @@ class RepositoryManager(Component):
         self.manager = TracRepositoryManager(self.env)
 
     def get_supported_types(self):
+        """Return the list of supported repository types."""
         types = set(type for connector in self.connectors
                     for (type, prio) in connector.get_supported_types() or []
                     if prio >= 0)
         return list(types & set(self.manager.get_supported_types()))
 
     def get_forkable_types(self):
+        """Return the list of forkable repository types."""
         return list(type for type in self.get_supported_types()
                     if self.can_fork(type))
 
     def can_fork(self, type):
+        """Return whether the given repository type can be forked."""
         return self._get_repository_connector(type).can_fork(type)
 
     def get_forkable_repositories(self):
+        """Return a dictionary of repository information, indexed by
+        name and including only repositories that can be forked."""
         repositories = self.manager.get_all_repositories()
         for key in repositories:
             if repositories[key]['type'] in self.get_forkable_types():
                 yield repositories[key]['name']
 
     def get_repository(self, name, convert_to_managed=False):
+        """Retrieve the appropriate repository for the given name.
+
+        Converts the found repository into a `ManagedRepository`, if
+        requested. In that case, expect an exception if the found
+        repository was not created using this `RepositoryManager`.
+        """
         repo = self.manager.get_repository(name)
         if repo and convert_to_managed:
             convert_managed_repository(self.env, repo)
         return repo
 
     def get_repository_by_path(self, path):
+        """Retrieve a matching `Repository` for the given path."""
         return self.manager.get_repository_by_path(path)
 
     def create(self, repo):
+        """Create a new empty repository.
+
+         * Checks if the new repository can be created and added
+         * Prepares the filesystem
+         * Uses an appropriate connector to create and initialize the
+           repository
+         * Postprocesses the filesystem (modes)
+         * Inserts everything into the database and synchronizes Trac
+        """
         if self.get_repository(repo['name']) or os.path.lexists(repo['dir']):
             raise TracError(_("Repository or directory already exists."))
 
@@ -102,10 +134,19 @@ class RepositoryManager(Component):
         self.manager.get_repository(repo['name']).sync(None, True)
 
     def fork_local(self, repo):
+        """Fork a local repository.
+
+         * Checks if the new repository can be created and added
+         * Checks if the origin exists and can be forked
+         * The filesystem is obviously already prepared
+         * Uses an appropriate connector to fork the repository
+         * Postprocesses the filesystem (modes)
+         * Inserts everything into the database and synchronizes Trac
+        """
         if self.get_repository(repo['name']) or os.path.lexists(repo['dir']):
             raise TracError(_("Repository or directory already exists."))
 
-        origin = self.get_repository(repo['origin'])
+        origin = self.get_repository(repo['origin'], True)
         if not origin:
             raise TracError(_("Origin for local fork does not exist."))
         if origin.type != repo['type']:
@@ -129,6 +170,7 @@ class RepositoryManager(Component):
         self.manager.get_repository(repo['name']).sync(None, True)
 
     def modify(self, repo, data):
+        """Modify an existing repository."""
         convert_managed_repository(self.env, repo)
         if repo.directory != data['dir']:
             shutil.move(repo.directory, data['dir'])
@@ -140,6 +182,11 @@ class RepositoryManager(Component):
             self.manager.reload_repositories()
 
     def remove(self, repo, delete):
+        """Remove an existing repository.
+
+        Depending on the parameter delete this method  also removes the
+        repository from the filesystem. This can not be undone.
+        """
         convert_managed_repository(self.env, repo)
         with self.env.db_transaction as db:
             db("DELETE FROM repository WHERE id = %d" % repo.id)
@@ -149,12 +196,14 @@ class RepositoryManager(Component):
 
     ### Private methods
     def _get_repository_connector(self, repo_type):
+        """Get the matching connector with maximum priority."""
         return max(((connector, type, prio) for connector in self.connectors
                     for (type, prio) in connector.get_supported_types()
                     if prio >= 0 and type == repo_type),
                    key=lambda x: x[2])[0]
 
     def _prepare_base_directory(self, directory):
+        """Create the base directories and set the correct modes."""
         base = os.path.dirname(directory)
         try:
             os.makedirs(base)
@@ -166,6 +215,7 @@ class RepositoryManager(Component):
                 raise
 
     def _adjust_modes(self, directory):
+        """Set modes 750 and 640 for directories and files."""
         try:
             os.chmod(directory, stat.S_IRWXU | stat.S_IRWXG)
             fmodes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
@@ -180,8 +230,19 @@ class RepositoryManager(Component):
 
 
 def convert_managed_repository(env, repo):
+    """Convert a given repository into a `ManagedRepository`."""
 
     class ManagedRepository(repo.__class__):
+        """A repository managed by the new `RepositoryManager`.
+
+        This repository class inherits from the original class of the
+        given repository and adds fields needed by the manager.
+
+        Trying to convert a repository that was added via the original
+        `RepositoryAdminPanel` raises an exception and can therefore
+        be used to easily check if we are working with a manageable
+        repository.
+        """
 
         id = None
         owner = None
@@ -208,12 +269,28 @@ def convert_managed_repository(env, repo):
         repo.directory = info['dir']
 
 def convert_forked_repository(env, repo):
+    """Convert a given repository into a `ForkedRepository`."""
 
     class ForkedRepository(repo.__class__):
+        """A local fork of a `ManagedRepository`.
+
+        This repository class inherits from the original class of the
+        given repository and adds fields and methods needed by the
+        manager and for e.g. pull requests.
+
+        Trying to convert a repository that was not forked via the new
+        `RepositoryManager` raises an exception and can therefore
+        be used to easily check if we are working with a forked
+        repository.
+        """
 
         origin = None
 
         def get_youngest_common_ancestor(self, rev):
+            """Goes back in the repositories history starting from
+            `rev` until it finds a revision that also exists in the
+            origin of this fork.
+            """
             nodes = [rev]
             while len(nodes):
                 node = nodes.pop(0)

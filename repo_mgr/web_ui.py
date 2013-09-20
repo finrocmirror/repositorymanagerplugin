@@ -19,6 +19,8 @@ import os
 import re
 
 class RepositoryManagerModule(Component):
+    """The `RepositoryManager`'s user interface."""
+
     implements(IPermissionRequestor, IRequestHandler, ITemplateProvider)
 
     base_dir = PathOption('repository-manager', 'base_dir', 'repositories',
@@ -107,6 +109,9 @@ class RepositoryManagerModule(Component):
         return True
 
     def _create(self, req, repo, creator):
+        """Check if a repository can be created and create it using the
+        given creator function.
+        """
         if not repo['name']:
             add_warning(req, _("Missing arguments to create a repository."))
         elif self._check_and_update_repository(req, repo):
@@ -117,6 +122,12 @@ class RepositoryManagerModule(Component):
             req.redirect(req.href.repository('create'))
 
     def _process_create_request(self, req, data):
+        """Create a new repository.
+
+        Depending on the content of `req.args` either create a new empty
+        repository, fork a locally existing one or fork a remote
+        repository.
+        """
         req.perm.require('REPOSITORY_CREATE')
         repository, local_fork, remote_fork = {}, {}, {}
 
@@ -160,6 +171,9 @@ class RepositoryManagerModule(Component):
                      'remote_fork': remote_fork})
 
     def _check_repository(self, req, name, permission):
+        """Check if a repository exists and the user has the given
+        permission and is the owner.
+        """
         if not name:
             raise TracError(_("Repository not specified"))
 
@@ -175,6 +189,7 @@ class RepositoryManagerModule(Component):
         return repository
 
     def _process_modify_request(self, req, data):
+        """Modify an existing repository."""
         repo = self._check_repository(req, req.args.get('reponame'),
                                       'REPOSITORY_MODIFY')
 
@@ -205,6 +220,7 @@ class RepositoryManagerModule(Component):
                      'referer': referer})
 
     def _process_remove_request(self, req, data):
+        """Remove an existing repository."""
         repo = self._check_repository(req, req.args.get('reponame'),
                                       'REPOSITORY_REMOVE')
 
@@ -222,6 +238,8 @@ class RepositoryManagerModule(Component):
                      'referer': referer})
 
 class BrowserModule(Component):
+    """Add navigation items to the browser."""
+
     implements(INavigationContributor, IRequestFilter)
 
     ### INavigationContributor methods
