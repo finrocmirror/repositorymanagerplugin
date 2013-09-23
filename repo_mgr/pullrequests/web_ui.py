@@ -34,7 +34,8 @@ class PullrequestModule(Component):
     workflow. 
     """
 
-    implements(IPermissionRequestor, IRequestHandler, IRequestFilter)
+    implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
+               ITemplateProvider)
 
     cf_srcrepo = Option('ticket-custom', 'pr_srcrepo', 'text')
     cf_srcrepo = Option('ticket-custom', 'pr_srcrepo.label',
