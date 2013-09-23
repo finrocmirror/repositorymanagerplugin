@@ -8,13 +8,7 @@
   <form class="addnew" method="post">
     <fieldset>
       <legend>Create New Repository:</legend>
-      <label>Name: <input type="text" name="name" value="$repository.name"/></label>
-      <label>Type:
-        <select size="1" name="type">
-          <option py:for="type in supported_repository_types" value="$type" selected="${type == repository.type or None}">$type</option>
-        </select>
-      </label>
-      <label py:if="not restrict_dir">Directory: <input type="text" name="dir" value="$repository.dir" /></label>
+      ${main_repository_fields(repository, 'create_', True)}
       <input type="submit" name="create" value="${_('Create Repository')}" />
       <p class="help">
         Create a new empty repository from scratch.
@@ -31,17 +25,16 @@
     <fieldset>
       <legend>Fork Remote Repository:</legend>
       <div>
-        <label>Source URL: <input type="text" name="url" /></label>
+        <label>Source URL: <input type="text" name="remote_url" /></label>
         <label>Type:
-          <select size="1" name="type">
+          <select size="1" name="remote_type">
             <option py:for="type in forkable_repository_types" value="$type" selected="${type == selected_fork_type or None}">$type</option>
           </select>
         </label>
-        <label>Username: <input type="text" name="username" /></label>
-        <label>Password: <input type="password" name="password" /></label>
+        <label>Username: <input type="text" name="remote_username" /></label>
+        <label>Password: <input type="password" name="remote_password" /></label>
       </div>
-      <label>Name: <input type="text" name="name" /></label>
-      <label py:if="not restrict_dir">Directory: <input type="text" name="dir" /></label>
+      ${main_repository_fields(remote_fork, 'remote_', False)}
       <input type="submit" name="fork_remote" value="${_('Create Repository')}" />
       <p class="help">
         Fork an existing repository from an external ressource. Will appear as new repository within this Trac instance, but with initial content and history.

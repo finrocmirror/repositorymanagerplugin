@@ -3,26 +3,18 @@
      xmlns:xi="http://www.w3.org/2001/XInclude"
      xmlns:i18n="http://genshi.edgewall.org/i18n">
 
-    <form class="addnew" method="post">
-      <fieldset>
-        <legend>Fork Local Repository:</legend>
-        <div>
-          <py:choose>
-            <label py:when="forkable_repositories">Origin:
-              <select size="1" name="origin">
-                <option py:for="repo in forkable_repositories" value="$repo" selected="${repo == local_fork.origin or None}">$repo</option>
-              </select>
-            </label>
-            <input py:otherwise type="hidden" name="origin" value="$local_fork.origin" />
-          </py:choose>
-        </div>
-        <label>Name: <input type="text" name="name" value="$local_fork.name" /></label>
-        <label py:if="not restrict_dir">Directory: <input type="text" name="dir" value="$local_fork.dir" /></label>
-        <input type="submit" name="fork_local" value="${_('Create Forked Repository')}" />
-        <p class="help">
-          Fork an existing repository within this Trac instance.
-        </p>
-      </fieldset>
-    </form>
+  <form class="addnew" method="post">
+    <fieldset>
+      <legend>Fork Local Repository:</legend>
+      <div>
+        ${optional_dropdown_list("Origin", "local_origin", local_fork.origin, forkable_repositories)}
+      </div>
+      ${main_repository_fields(local_fork, 'local_', False)}
+      <input type="submit" name="fork_local" value="${_('Create Forked Repository')}" />
+      <p class="help">
+        Fork an existing repository within this Trac instance.
+      </p>
+    </fieldset>
+  </form>
 
 </div>

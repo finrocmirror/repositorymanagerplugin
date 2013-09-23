@@ -1,7 +1,7 @@
 from api import *
 
 from trac.core import *
-from trac.perm import IPermissionRequestor, PermissionError
+from trac.perm import IPermissionRequestor, PermissionError, PermissionSystem
 from trac.web import IRequestHandler, IRequestFilter
 from trac.web.auth import LoginModule
 from trac.web.chrome import INavigationContributor, ITemplateProvider, \
@@ -35,8 +35,7 @@ class RepositoryManagerModule(Component):
 
     ### IPermissionRequestor methods
     def get_permission_actions(self):
-        actions = ['REPOSITORY_CREATE', 'REPOSITORY_FORK', 'REPOSITORY_MODIFY',
-                   'REPOSITORY_REMOVE']
+        actions = ['REPOSITORY_CREATE', 'REPOSITORY_FORK']
         return actions + [('REPOSITORY_ADMIN', actions)]
 
     ### IRequestHandler methods
@@ -60,7 +59,7 @@ class RepositoryManagerModule(Component):
             self._process_create_request(req, data)
         elif action == 'fork':
             repo = self._get_checked_repository(req, req.args.get('reponame'),
-                                                'REPOSITORY_FORK')
+                                                False, 'REPOSITORY_FORK')
             if not repo.is_forkable:
                 raise TracError(_("Repository is not forkable"))
             self._process_fork_request(req, data)
@@ -68,6 +67,16 @@ class RepositoryManagerModule(Component):
             self._process_modify_request(req, data)
         elif action == 'remove':
             self._process_remove_request(req, data)
+
+        possible_owners = None
+        if 'REPOSITORY_ADMIN' in req.perm:
+            possible_owners = list(u[0] for u in self.env.get_known_users())
+            possible_owners.sort()
+
+        referer = req.args.get('referer', req.get_header('Referer'))
+
+        data.update({'possible_owners': self._get_possible_owners(req),
+                     'referer': referer})
 
 #        add_stylesheet(req, 'common/css/browser.css')
         add_stylesheet(req, 'common/css/admin.css')
@@ -91,28 +100,19 @@ class RepositoryManagerModule(Component):
         repository.
         """
         req.perm.require('REPOSITORY_CREATE')
-        repository, remote_fork = {}, {}
 
         rm = RepositoryManager(self.env);
 
+        repository = self._get_repository_data_from_request(req, 'create_')
+        remote_fork = self._get_repository_data_from_request(req, 'remote_')
+
         if req.args.get('create'):
-            directory = req.args.get('dir', req.args.get('name'))
-            repository = {'name': req.args.get('name'),
-                          'type': req.args.get('type'),
-                          'dir': normalize_whitespace(directory),
-                          'owner': req.authname}
             self._create(req, repository, rm.create)
 
-        elif req.args.get('fork_local'):
-            self._process_fork_request(req, data)
-
         elif req.args.get('fork_remote'):
-            directory = req.args.get('dir', req.args.get('name'))
-            remote_fork = {'name': req.args.get('name'),
-                           'type': req.args.get('type'),
-                           'dir': normalize_whitespace(directory),
-                           'owner': req.authname}
             self._create(req, remote_fork, rm.fork_remote)
+
+        self._process_fork_request(req, data)
 
         data.update({'title': _("Create Repository"),
                      'supported_repository_types': rm.get_supported_types(),
@@ -124,35 +124,34 @@ class RepositoryManagerModule(Component):
 
     def _process_fork_request(self, req, data):
         """Fork an existing repository."""
-        origin_name = req.args.get('origin', req.args.get('reponame'))
-        directory = req.args.get('dir', req.args.get('name'))
-        local_fork = {'name': req.args.get('name'),
-                      'dir': normalize_whitespace(directory),
-                      'owner': req.authname,
-                      'origin': origin_name}
+        origin_name = req.args.get('local_origin', req.args.get('reponame'))
+        local_fork = self._get_repository_data_from_request(req, 'local_')
+        local_fork['origin'] = req.args.get('local_origin')
+
         if req.args.get('fork_local'):
             origin = self._get_checked_repository(req, local_fork['origin'],
-                                                  'REPOSITORY_FORK')
+                                                  False, 'REPOSITORY_FORK')
             local_fork.update({'type': origin.type})
             rm = RepositoryManager(self.env);
             self._create(req, local_fork, rm.fork_local)
+
         data.update({'title': _("Fork Repository %(name)s", name=origin_name),
                      'local_fork': local_fork})
 
     def _process_modify_request(self, req, data):
         """Modify an existing repository."""
-        repo = self._get_checked_repository(req, req.args.get('reponame'),
-                                            'REPOSITORY_MODIFY')
+        repo = self._get_checked_repository(req, req.args.get('reponame'))
 
         base_directory = self._get_base_directory(repo.type)
         prefix_length = len(base_directory)
         if prefix_length > 0:
             prefix_length += 1
 
-        directory = req.args.get('directory', repo.directory[prefix_length:])
-        new = {'name': req.args.get('name', repo.reponame),
-               'type': repo.type,
-               'dir': normalize_whitespace(directory)}
+        req.args['name'] = req.args.get('name', repo.reponame)
+        req.args['type'] = repo.type
+        req.args['dir'] = req.args.get('dir', repo.directory[prefix_length:])
+        req.args['owner'] = req.args.get('owner', repo.owner)
+        new = self._get_repository_data_from_request(req)
 
         if req.args.get('modify'):
             if self._check_and_update_repository(req, new):
@@ -164,16 +163,13 @@ class RepositoryManagerModule(Component):
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
 
-        referer = req.args.get('referer', req.get_header('Referer'))
         data.update({'title': _("Modify Repository"),
                      'repository': repo,
-                     'new': new,
-                     'referer': referer})
+                     'new': new})
 
     def _process_remove_request(self, req, data):
         """Remove an existing repository."""
-        repo = self._get_checked_repository(req, req.args.get('reponame'),
-                                            'REPOSITORY_REMOVE')
+        repo = self._get_checked_repository(req, req.args.get('reponame'))
 
         if req.args.get('confirm'):
             RepositoryManager(self.env).remove(repo, req.args.get('delete'))
@@ -183,14 +179,12 @@ class RepositoryManagerModule(Component):
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
 
-        referer = req.args.get('referer', req.get_header('Referer'))
         data.update({'title': _("Remove Repository"),
-                     'repository': repo,
-                     'referer': referer})
+                     'repository': repo})
 
-    def _get_checked_repository(self, req, name, permission):
-        """Check if a repository exists and the user has the given
-        permission and is the owner. Finally return the repository.
+    def _get_checked_repository(self, req, name, owner=True, permission=None):
+        """Check if a repository exists and the user is the owner and
+        has the given permission. Finally return the repository.
         """
         if not name:
             raise TracError(_("Repository not specified"))
@@ -201,7 +195,11 @@ class RepositoryManagerModule(Component):
             raise TracError(_('Repository "%(name)s" does not exist.',
                               name=name))
 
-        if not (permission in req.perm and req.authname == repository.owner):
+        if owner and not repository.owner == req.authname:
+            raise PermissionError(msg=_('You are not the owner of "%(name)s"',
+                                        name=name))
+
+        if permission and not permission in req.perm:
             raise PermissionError(permission, None, self.env)
 
         return repository
@@ -258,6 +256,25 @@ class RepositoryManagerModule(Component):
         repo.update({'dir': directory})
         return True
 
+    def _get_possible_owners(self, req):
+        """Get the list of known users if `REPOSITORY_ADMIN` permission is
+        available. None otherwise."""
+        if 'REPOSITORY_ADMIN' in req.perm:
+            possible_owners = list(u[0] for u in self.env.get_known_users())
+            possible_owners.append('anonymous')
+            possible_owners.sort()
+            return possible_owners
+        return None
+
+    def _get_repository_data_from_request(self, req, prefix=''):
+        """Fill a dict with common repository data for create/fork/modify
+        actions."""
+        directory = req.args.get(prefix + 'dir', req.args.get(prefix + 'name'))
+        return {'name': req.args.get(prefix + 'name'),
+                'type': req.args.get(prefix + 'type'),
+                'dir': normalize_whitespace(directory),
+                'owner': req.args.get(prefix + 'owner', req.authname)}
+
 class BrowserModule(Component):
     """Add navigation items to the browser."""
 
@@ -282,21 +299,20 @@ class BrowserModule(Component):
             path = req.args.get('path', '/')
             reponame, repo, path = rm.get_repository_by_path(path)
             if repo:
-                convert_managed_repository(self.env, repo)
-                if path == '/' and (repo.owner == req.authname or
-                                    'REPOSITORY_ADMIN' in req.perm):
+                if path == '/':
                     try:
+                        convert_managed_repository(self.env, repo)
                         if 'REPOSITORY_FORK' in req.perm and repo.is_forkable:
                             href = req.href.repository('fork', repo.reponame)
                             add_ctxtnav(req, _("Fork"), href)
-                        if 'REPOSITORY_MODIFY' in req.perm:
+                        if (repo.owner == req.authname or
+                            'REPOSITORY_ADMIN' in req.perm):
                             href = req.href.repository('modify', repo.reponame)
                             add_ctxtnav(req, _("Modify"), href)
-                        if 'REPOSITORY_REMOVE' in req.perm:
                             href = req.href.repository('remove', repo.reponame)
                             add_ctxtnav(req, _("Remove"), href)
                     except:
-                        raise
+                        pass
 
                     try:
                         convert_forked_repository(self.env, repository)

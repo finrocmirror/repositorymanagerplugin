@@ -13,6 +13,25 @@
     <div id="content">
 
       <h1>$title</h1>
+     
+      <py:def function="optional_dropdown_list(label, name, default, options)">
+        <label py:if="options">$label:
+          <select size="1" name="$name">
+            <option py:for="option in options" value="$option" selected="${option == default or None}">$option</option>
+          </select>
+        </label>
+      </py:def>
+
+      <py:def function="main_repository_fields(data, prefix, select_type)">
+        <label>Name: <input type="text" name="${prefix + 'name'}" value="$data.name"/></label>
+        <label py:if="select_type">Type:
+          <select size="1" name="${prefix + 'type'}">
+            <option py:for="type in supported_repository_types" value="$type" selected="${type == data.type or None}">$type</option>
+          </select>
+        </label>
+        <label py:if="not restrict_dir">Directory: <input type="text" name="${prefix + 'dir'}" value="$data.dir" /></label>
+        ${optional_dropdown_list("Owner", prefix + 'owner', data.owner, possible_owners)}
+      </py:def>
 
       <py:choose test="action">
         <xi:include py:when="'create'" href="repository_create.html" />

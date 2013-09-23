@@ -6,8 +6,7 @@
   <form class="addnew" method="post">
     <fieldset>
       <legend>Modification of repository $repository.reponame</legend>
-      <label>Name: <input type="text" name="name" value="$new.name" /></label>
-      <label>Directory: <input type="text" name="dir" value="$new.dir" /></label>
+      ${main_repository_fields(new, '', False)}
       <input type="submit" name="modify" value="${_('Modify Repository')}" />
       <input type="submit" name="cancel" value="${_('Cancel')}" />
     </fieldset>

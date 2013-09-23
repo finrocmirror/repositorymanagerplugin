@@ -170,6 +170,9 @@ class PullrequestModule(Component):
         req.args['pr_srcrev'] = req.args.get('pr_srcrev',
                                              repo.get_youngest_rev())
 
+        # TODO
+        # hier muss noch die sache mit den maintainern rein.
+
         tm = TicketModule(self.env)
         template, data, content_type = tm.process_request(req)
 
