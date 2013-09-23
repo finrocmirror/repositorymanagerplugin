@@ -84,9 +84,11 @@ class RepositoryManager(Component):
         """Return a dictionary of repository information, indexed by
         name and including only repositories that can be forked."""
         repositories = self.manager.get_all_repositories()
+        result = {}
         for key in repositories:
             if repositories[key]['type'] in self.get_forkable_types():
-                yield repositories[key]['name']
+                result[key] = repositories[key]['name']
+        return result
 
     def get_repository(self, name, convert_to_managed=False):
         """Retrieve the appropriate repository for the given name.

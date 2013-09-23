@@ -5,7 +5,7 @@
 
   <h2>New Repository</h2>
 
-  <form class="addnew" action="${href.repository('create')}" method="post">
+  <form class="addnew" method="post">
     <fieldset>
       <legend>Create New Repository:</legend>
       <label>Name: <input type="text" name="name" value="$repository.name"/></label>
@@ -14,7 +14,7 @@
           <option py:for="type in supported_repository_types" value="$type" selected="${type == repository.type or None}">$type</option>
         </select>
       </label>
-      <label>Directory: <input type="text" name="dir" value="$repository.dir" /></label>
+      <label py:if="not restrict_dir">Directory: <input type="text" name="dir" value="$repository.dir" /></label>
       <input type="submit" name="create" value="${_('Create Repository')}" />
       <p class="help">
         Create a new empty repository from scratch.
@@ -24,29 +24,10 @@
 
   <h2>Fork Repository</h2>
 
-  <py:if test="forkable_repositories">
-    <form class="addnew" action="${href.repository('create')}" method="post">
-      <fieldset>
-        <legend>Fork Local Repository:</legend>
-        <div>
-          <label>Origin:
-            <select size="1" name="origin">
-              <option py:for="repo in forkable_repositories" value="$repo" selected="${repo == local_fork.origin or None}">$repo</option>
-            </select>
-          </label>
-        </div>
-        <label>Name: <input type="text" name="name" value="$local_fork.name" /></label>
-        <label>Directory: <input type="text" name="dir" value="$local_fork.dir" /></label>
-        <input type="submit" name="fork_local" value="${_('Create Forked Repository')}" />
-        <p class="help">
-          Fork an existing repository within this Trac instance.
-        </p>
-      </fieldset>
-    </form>
-  </py:if>
+  <xi:include py:if="forkable_repositories" href="repository_fork.html" />
 
 <!--
-  <form class="addnew" action="${href.repository('create')}" method="post">
+  <form class="addnew" method="post">
     <fieldset>
       <legend>Fork Remote Repository:</legend>
       <div>
@@ -60,7 +41,7 @@
         <label>Password: <input type="password" name="password" /></label>
       </div>
       <label>Name: <input type="text" name="name" /></label>
-      <label>Directory: <input type="text" name="dir" /></label>
+      <label py:if="not restrict_dir">Directory: <input type="text" name="dir" /></label>
       <input type="submit" name="fork_remote" value="${_('Create Repository')}" />
       <p class="help">
         Fork an existing repository from an external ressource. Will appear as new repository within this Trac instance, but with initial content and history.
