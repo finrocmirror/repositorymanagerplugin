@@ -30,7 +30,7 @@
           </select>
         </label>
         <label py:if="not restrict_dir">Directory: <input type="text" name="${prefix + 'dir'}" value="$data.dir" /></label>
-        ${optional_dropdown_list("Owner", prefix + 'owner', data.owner, possible_owners)}
+        ${optional_dropdown_list("Owner", prefix + 'owner', data.owner, sorted(possible_owners))}
       </py:def>
 
       <py:choose test="action">

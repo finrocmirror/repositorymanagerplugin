@@ -5,11 +5,56 @@
 
   <form class="addnew" method="post">
     <fieldset>
-      <legend>Modification of repository $repository.reponame</legend>
+      <legend>Modify ${repository.type.upper()} Repository</legend>
       ${main_repository_fields(new, '', False)}
       <input type="submit" name="modify" value="${_('Modify Repository')}" />
       <input type="submit" name="cancel" value="${_('Cancel')}" />
     </fieldset>
+  </form>
+
+  <py:def function="selectable_list(list, anonymous, users, groups, name)">
+    <div>
+      <select size="1" name="$name">
+        <option></option>
+        <option py:if="anonymous" value="anonymous">anonymous</option>
+        <optgroup py:if="users" label="Users">
+          <option py:for="user in sorted(users)" value="$user">$user</option>
+        </optgroup>
+        <optgroup py:if="groups" label="Groups">
+          <option py:for="group in sorted(groups)" value="@$group">$group</option>
+        </optgroup>
+      </select>
+      <input type="submit" name="add_role_$name" value="${_('Add')}" />
+    </div>
+    <label py:for="item in sorted(list)">
+      <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" />
+      $item<br />
+    </label>
+  </py:def>
+
+  <form method="post">
+    <h2>Permissions</h2>
+    <table class="listing">
+      <thead>
+        <tr><th py:if="repository.is_forkable">Maintainers</th><th>Read+Write</th><th>Read only</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td py:if="repository.is_forkable">
+            ${selectable_list(repository.maintainer, False, possible_owners, None, 'maintainer')}
+          </td>
+          <td>
+            ${selectable_list(repository.writer, True, users, groups, 'writer')}
+          </td>
+          <td>
+            ${selectable_list(repository.reader, True, users, groups, 'reader')}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="buttons">
+      <input type="submit" name="revoke" value="${_('Remove selected items')}" />
+    </div>
   </form>
 
 </div>

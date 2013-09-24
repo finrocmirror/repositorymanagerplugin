@@ -61,6 +61,8 @@ class RepositoryManager(Component):
 
     manager = None
 
+    roles = ('maintainer', 'writer', 'reader')
+
     def __init__(self):
         self.manager = TracRepositoryManager(self.env)
 
@@ -127,11 +129,12 @@ class RepositoryManager(Component):
 
         with self.env.db_transaction as db:
             id = self.manager.get_repository_id(repo['name'])
+            roles = list((id, role, '') for role in self.roles)
             db.executemany(
                 "INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)",
                 [(id, 'dir', repo['dir']),
                  (id, 'type', repo['type']),
-                 (id, 'owner', repo['owner'])])
+                 (id, 'owner', repo['owner'])] + roles)
             self.manager.reload_repositories()
         self.manager.get_repository(repo['name']).sync(None, True)
 
@@ -196,6 +199,22 @@ class RepositoryManager(Component):
         if delete:
             shutil.rmtree(repo.directory)
 
+    def add_role(self, repo, role, subject):
+        """Add a role for the given repository."""
+        assert role in self.roles
+        convert_managed_repository(self.env, repo)
+        setattr(repo, role, getattr(repo, role) | set([subject]))
+        self._update_roles_in_db(repo)
+
+    def revoke_roles(self, repo, roles):
+        """Revoke a list or `role, subject` pairs."""
+        convert_managed_repository(self.env, repo)
+        for role, subject in roles:
+            config = getattr(repo, role)
+            config = config - set([subject])
+            setattr(repo, role, getattr(repo, role) - set([subject]))
+        self._update_roles_in_db(repo)
+
     ### Private methods
     def _get_repository_connector(self, repo_type):
         """Get the matching connector with maximum priority."""
@@ -230,6 +249,11 @@ class RepositoryManager(Component):
         except OSError, e:
             raise TracError(_("Failed to adjust file modes: " + str(e)))
 
+    def _update_roles_in_db(self, repo):
+        with self.env.db_transaction as db:
+            db.executemany(
+                "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
+                [(','.join(getattr(repo, r)), repo.id, r) for r in self.roles])
 
 def convert_managed_repository(env, repo):
     """Convert a given repository into a `ManagedRepository`."""
@@ -249,24 +273,36 @@ def convert_managed_repository(env, repo):
         id = None
         owner = None
         type = None
-        is_forkable = None
+        is_forkable = False
         directory = None
+        maintainer = set()
+        writer = set()
+        reader = set()
+
+    def _get_role(db, role):
+        result = db("""SELECT value FROM repository
+                       WHERE name = '%s' AND id = %d
+                       """ % (role, repo.id))[0][0]
+        if result:
+            return set(result.split(','))
+        return set()
 
     if repo.__class__ is not ManagedRepository:
         repo.__class__ = ManagedRepository
         trac_rm = TracRepositoryManager(env)
         repo.id = trac_rm.get_repository_id(repo.reponame)
+        rm = RepositoryManager(env)
         with env.db_transaction as db:
-            result = db("""SELECT value FROM repository
-                           WHERE name = 'owner' AND id = %d
-                           """ % repo.id)
-            if not result:
+            repo.owner = db("""SELECT value FROM repository
+                               WHERE name = 'owner' AND id = %d
+                               """ % repo.id)[0][0]
+            if not repo.owner:
                 raise TracError(_("Not a managed repository"))
-            repo.owner = result[0][0]
+            for role in rm.roles:
+                setattr(repo, role, getattr(repo, role) | _get_role(db, role))
 
         info = trac_rm.get_all_repositories().get(repo.reponame)
         repo.type = info['type']
-        rm = RepositoryManager(env)
         repo.is_forkable = repo.type in rm .get_forkable_types()
         repo.directory = info['dir']
 

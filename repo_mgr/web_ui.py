@@ -10,7 +10,8 @@ from trac.web.chrome import INavigationContributor, ITemplateProvider, \
 from trac.versioncontrol.admin import RepositoryAdminPanel
 from trac.util import is_path_below
 from trac.util.translation import _, tag_
-from trac.util.text import normalize_whitespace
+from trac.util.text import normalize_whitespace, \
+                           unicode_to_base64, unicode_from_base64
 from trac.config import BoolOption, PathOption
 
 from genshi.builder import tag
@@ -53,7 +54,10 @@ class RepositoryManagerModule(Component):
             req.redirect(req.href.browser())
 
         data = {'action': action,
-                'restrict_dir': self.restrict_dir}
+                'restrict_dir': self.restrict_dir,
+                'possible_owners': self._get_possible_owners(req),
+                'referer': req.args.get('referer', req.get_header('Referer')),
+                'unicode_to_base64': unicode_to_base64}
 
         if action == 'create':
             self._process_create_request(req, data)
@@ -70,13 +74,7 @@ class RepositoryManagerModule(Component):
 
         possible_owners = None
         if 'REPOSITORY_ADMIN' in req.perm:
-            possible_owners = list(u[0] for u in self.env.get_known_users())
-            possible_owners.sort()
-
-        referer = req.args.get('referer', req.get_header('Referer'))
-
-        data.update({'possible_owners': self._get_possible_owners(req),
-                     'referer': referer})
+            possible_owners = {u[0] for u in self.env.get_known_users()}
 
 #        add_stylesheet(req, 'common/css/browser.css')
         add_stylesheet(req, 'common/css/admin.css')
@@ -153,19 +151,36 @@ class RepositoryManagerModule(Component):
         req.args['owner'] = req.args.get('owner', repo.owner)
         new = self._get_repository_data_from_request(req)
 
+        rm = RepositoryManager(self.env)
         if req.args.get('modify'):
             if self._check_and_update_repository(req, new):
-                RepositoryManager(self.env).modify(repo, new)
+                rm.modify(repo, new)
                 link = tag.a(repo.reponame, href=req.href.browser(new['name']))
                 add_notice(req, tag_('The repository "%(link)s" has been '
                                      'modified.', link=link))
                 req.redirect(req.href.repository())
+        elif self._process_role_adding(req, repo):
+            req.redirect(req.href(req.path_info))
+        elif req.args.get('revoke'):
+            selection = req.args.get('selection')
+            if selection:
+                if not isinstance(selection, list):
+                    selection = [selection]
+                roles = [role.split(':') for role in selection]
+                decode = unicode_from_base64
+                roles = [(decode(role[0]), decode(role[1])) for role in roles]
+                rm.revoke_roles(repo, roles)
+                req.redirect(req.href(req.path_info))
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
 
-        data.update({'title': _("Modify Repository"),
+        repo_link = tag.a(repo.reponame, href=req.href.browser(repo.reponame))
+        data.update({'title': tag_("Modify Repository %(link)s",
+                                   link=repo_link),
                      'repository': repo,
-                     'new': new})
+                     'new': new,
+                     'users': self._get_users(),
+                     'groups': self._get_groups()})
 
     def _process_remove_request(self, req, data):
         """Remove an existing repository."""
@@ -195,9 +210,11 @@ class RepositoryManagerModule(Component):
             raise TracError(_('Repository "%(name)s" does not exist.',
                               name=name))
 
-        if owner and not repository.owner == req.authname:
-            raise PermissionError(msg=_('You are not the owner of "%(name)s"',
-                                        name=name))
+        if owner and not (repository.owner == req.authname or
+                          'REPOSITORY_ADMIN' in req.perm):
+            message = _('You (%(user)s) are not the owner of "%(name)s"',
+                        user=req.authname, name=name)
+            raise PermissionError(message)
 
         if permission and not permission in req.perm:
             raise PermissionError(permission, None, self.env)
@@ -260,11 +277,30 @@ class RepositoryManagerModule(Component):
         """Get the list of known users if `REPOSITORY_ADMIN` permission is
         available. None otherwise."""
         if 'REPOSITORY_ADMIN' in req.perm:
-            possible_owners = list(u[0] for u in self.env.get_known_users())
-            possible_owners.append('anonymous')
-            possible_owners.sort()
-            return possible_owners
+            return {u[0] for u in self.env.get_known_users()}
         return None
+
+    def _get_users(self):
+        """Get the list of known users."""
+        return {u[0] for u in self.env.get_known_users()}
+
+    def _get_groups(self):
+        """Get the list of known groups."""
+        ps = PermissionSystem(self.env)
+        result = list(set(perm[1] for perm in ps.get_all_permissions()
+                      if not perm[1].isupper()))
+        return result
+
+    def _process_role_adding(self, req, repo):
+        rm = RepositoryManager(self.env)
+        for role in rm.roles:
+            if req.args.get('add_role_' + role):
+                subject = req.args.get(role)
+                if subject:
+                    rm.add_role(repo, role, subject)
+                    return True
+                add_warning(req, _("Please choose an option from the list."))
+        return False
 
     def _get_repository_data_from_request(self, req, prefix=''):
         """Fill a dict with common repository data for create/fork/modify
