@@ -49,6 +49,7 @@ class RepositoryManagerModule(Component):
             return True
 
     def process_request(self, req):
+        RepositoryManager(self.env).update_auth_files()
         action = req.args.get('action', 'list')
         if action == 'list':
             req.redirect(req.href.browser())

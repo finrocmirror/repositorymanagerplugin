@@ -36,3 +36,6 @@ class SubversionConnector(Component):
             shutil.rmtree(layout)
         except Exception, e:
             raise TracError(_("Failed to initialize repository: ") + str(e))
+
+    def update_auth_files(self, repositories):
+        pass

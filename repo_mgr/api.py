@@ -1,5 +1,6 @@
 from trac.core import *
 from trac.versioncontrol.api import RepositoryManager as TracRepositoryManager
+from trac.perm import PermissionSystem
 from trac.util.translation import _
 
 import os
@@ -41,6 +42,9 @@ class IAdministrativeRepositoryConnector(Interface):
 
     def fork(repository):
         """Fork from `origin_url` in the given dict."""
+
+    def update_auth_files(repositories):
+        """Write auth information to e.g. authz for .hgrc files"""
 
 class RepositoryManager(Component):
     """Adds creation, modification and deletion of repositories.
@@ -215,6 +219,22 @@ class RepositoryManager(Component):
             setattr(repo, role, getattr(repo, role) - set([subject]))
         self._update_roles_in_db(repo)
 
+    def update_auth_files(self):
+        """Rewrites all configured auth files for all managed
+        repositories.
+        """
+        types = self.get_supported_types()
+        all_repositories = []
+        for repo in self.manager.get_real_repositories():
+            try:
+                convert_managed_repository(self.env, repo)
+                all_repositories.append(repo)
+            except:
+                pass
+        for type in types:
+            repos = [repo for repo in all_repositories if repo.type == type]
+            self._get_repository_connector(type).update_auth_files(repos)
+
     ### Private methods
     def _get_repository_connector(self, repo_type):
         """Get the matching connector with maximum priority."""
@@ -364,3 +384,22 @@ def convert_forked_repository(env, repo):
                                   "does not exist anymore"))
 
     assert repo.origin
+
+def expand_user_set(env, users):
+    all_permissions = PermissionSystem(env).get_all_permissions()
+
+    known_users = {u[0] for u in env.get_known_users()} | set(['anonymous'])
+    valid_users = {perm[0] for perm in all_permissions} & known_users
+
+    groups = set()
+    user_list = list(users)
+    for user in user_list:
+        if user[0] == '@':
+            groups |= set([user])
+            for perm in (perm for perm in all_permissions
+                         if perm[1] == user[1:]):
+                if perm[0] in valid_users:
+                    user_list.append(perm[0])
+                elif not perm[0] in groups:
+                    user_list.append('@' + perm[0])
+    return set(user_list) - groups
