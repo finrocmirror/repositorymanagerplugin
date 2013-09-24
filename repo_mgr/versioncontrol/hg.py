@@ -1,5 +1,6 @@
 from ..api import *
 
+from trac.perm import PermissionSystem
 from trac.util.translation import _
 
 from ConfigParser import ConfigParser
@@ -62,3 +63,22 @@ class MercurialConnector(Component):
 
             with open(hgrc_path, 'wb') as hgrc_file:
                 hgrc.write(hgrc_file)
+
+def expand_user_set(env, users):
+    all_permissions = PermissionSystem(env).get_all_permissions()
+
+    known_users = {u[0] for u in env.get_known_users()} | set(['anonymous'])
+    valid_users = {perm[0] for perm in all_permissions} & known_users
+
+    groups = set()
+    user_list = list(users)
+    for user in user_list:
+        if user[0] == '@':
+            groups |= set([user])
+            for perm in (perm for perm in all_permissions
+                         if perm[1] == user[1:]):
+                if perm[0] in valid_users:
+                    user_list.append(perm[0])
+                elif not perm[0] in groups:
+                    user_list.append('@' + perm[0])
+    return set(user_list) - groups
