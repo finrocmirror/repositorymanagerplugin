@@ -275,7 +275,8 @@ class RepositoryManagerModule(Component):
 
     def _get_possible_owners(self, req):
         """Get the list of known users if `REPOSITORY_ADMIN` permission is
-        available. None otherwise."""
+        available. None otherwise.
+        """
         if 'REPOSITORY_ADMIN' in req.perm:
             return {u[0] for u in self.env.get_known_users()}
         return None
@@ -304,7 +305,8 @@ class RepositoryManagerModule(Component):
 
     def _get_repository_data_from_request(self, req, prefix=''):
         """Fill a dict with common repository data for create/fork/modify
-        actions."""
+        actions.
+        """
         directory = req.args.get(prefix + 'dir', req.args.get(prefix + 'name'))
         return {'name': req.args.get(prefix + 'name'),
                 'type': req.args.get(prefix + 'type'),
