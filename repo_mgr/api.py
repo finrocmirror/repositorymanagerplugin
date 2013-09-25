@@ -1,7 +1,10 @@
 from trac.core import *
 from trac.versioncontrol.api import RepositoryManager as TracRepositoryManager
+from trac.versioncontrol.svn_authz import AuthzSourcePolicy
 from trac.perm import PermissionSystem
 from trac.util.translation import _
+
+from ConfigParser import ConfigParser
 
 import os
 import errno
@@ -234,6 +237,48 @@ class RepositoryManager(Component):
         for type in types:
             repos = [repo for repo in all_repositories if repo.type == type]
             self._get_repository_connector(type).update_auth_files(repos)
+
+        authz_source_file = AuthzSourcePolicy(self.env).authz_file
+        if authz_source_file:
+            authz_source_path = os.path.join(self.env.path, authz_source_file)
+
+            authz = ConfigParser()
+
+            groups = set()
+            for repo in all_repositories:
+                groups |= {name for name in repo.maintainer if name[0] == '@'}
+                groups |= {name for name in repo.writer if name[0] == '@'}
+                groups |= {name for name in repo.reader if name[0] == '@'}
+
+            authz.add_section('groups')
+            for group in groups:
+                members = expand_user_set(self.env, [group])
+                authz.set('groups', group[1:], ', '.join(sorted(members)))
+            authenticated = sorted({u[0] for u in self.env.get_known_users()})
+            authz.set('groups', 'authenticated', ', '.join(authenticated))
+
+            for repo in all_repositories:
+                section = repo.reponame + ':/'
+                authz.add_section(section)
+                r = (set([repo.owner]) | repo.maintainer |
+                     repo.writer | repo.reader)
+
+                def apply_user_list(users, action):
+                    if not users:
+                        return
+                    if 'anonymous' in users:
+                        authz.set(section, '*', action)
+                        return
+                    if 'authenticated' in users:
+                        authz.set(section, '@authenticated', action)
+                        return
+                    for user in sorted(users):
+                        authz.set(section, user, action)
+
+                apply_user_list(r, 'r')
+
+            with open(authz_source_path, 'wb') as authz_file:
+                authz.write(authz_file)
 
     ### Private methods
     def _get_repository_connector(self, repo_type):
