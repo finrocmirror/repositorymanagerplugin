@@ -94,5 +94,5 @@ class SubversionConnector(Component):
             apply_user_list(rw, 'rw')
             apply_user_list(r, 'r')
 
-            with open(authz_path, 'wb') as authz_file:
-                authz.write(authz_file)
+        with open(authz_path, 'wb') as authz_file:
+            authz.write(authz_file)
