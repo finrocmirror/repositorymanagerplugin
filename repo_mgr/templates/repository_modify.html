@@ -17,6 +17,7 @@
       <select size="1" name="$name">
         <option></option>
         <option py:if="anonymous" value="anonymous">anonymous</option>
+        <option py:if="anonymous" value="authenticated">authenticated</option>
         <optgroup py:if="users" label="Users">
           <option py:for="user in sorted(users)" value="$user">$user</option>
         </optgroup>

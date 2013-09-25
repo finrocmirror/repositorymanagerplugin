@@ -41,25 +41,25 @@ class MercurialConnector(Component):
             hgrc = ConfigParser()
             hgrc.read(hgrc_path)
 
+            options = ('deny_read', 'deny_push', 'allow_read', 'allow_push')
             if hgrc.has_section('web'):
-                try:
-                    hgrc.remove_option('web', 'deny_read')
-                    hgrc.remove_option('web', 'deny_push')
-                    hgrc.remove_option('web', 'allow_read')
-                    hgrc.remove_option('web', 'allow_push')
-                except:
-                    pass
+                for option in options:
+                    if hgrc.has_option('web', option):
+                        hgrc.remove_option('web', option)
             else:
                 hgrc.add_section('web')
 
-            if not reader:
-                hgrc.set('web', 'deny_read', '*')
-            if not writer:
-                hgrc.set('web', 'deny_push', '*')
-            if not 'anonymous' in reader:
-                hgrc.set('web', 'allow_read', ', '.join(reader))
-            if not 'anonymous' in writer:
-                hgrc.set('web', 'allow_push', ', '.join(writer))
+            def apply_user_list(users, action):
+                if not users:
+                    hgrc.set('web', 'deny_' + action, '*')
+                elif 'authenticated' in users:
+                    if not 'anonymous' in users:
+                        hgrc.set('web', 'deny_' + action, 'anonymous')
+                else:
+                    hgrc.set('web', 'allow_' + action, ', '.join(users))
+
+            apply_user_list(reader, 'read')
+            apply_user_list(writer, 'push')
 
             with open(hgrc_path, 'wb') as hgrc_file:
                 hgrc.write(hgrc_file)
@@ -67,16 +67,17 @@ class MercurialConnector(Component):
 def expand_user_set(env, users):
     all_permissions = PermissionSystem(env).get_all_permissions()
 
-    known_users = {u[0] for u in env.get_known_users()} | set(['anonymous'])
+    special_users = set(['anonymous', 'authenticated'])
+    known_users = {u[0] for u in env.get_known_users()} | special_users
     valid_users = {perm[0] for perm in all_permissions} & known_users
 
     groups = set()
     user_list = list(users)
-    for user in user_list:
-        if user[0] == '@':
-            groups |= set([user])
+    for name in user_list:
+        if name[0] == '@':
+            groups |= set([name])
             for perm in (perm for perm in all_permissions
-                         if perm[1] == user[1:]):
+                         if perm[1] == name[1:]):
                 if perm[0] in valid_users:
                     user_list.append(perm[0])
                 elif not perm[0] in groups:
