@@ -22,7 +22,8 @@ import re
 class RepositoryManagerModule(Component):
     """The `RepositoryManager`'s user interface."""
 
-    implements(IPermissionRequestor, IRequestHandler, ITemplateProvider)
+    implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
+               ITemplateProvider)
 
     base_dir = PathOption('repository-manager', 'base_dir', 'repositories',
                           doc="""The base folder in which repositories will be
@@ -39,6 +40,20 @@ class RepositoryManagerModule(Component):
         actions = ['REPOSITORY_CREATE', 'REPOSITORY_FORK']
         return actions + [('REPOSITORY_ADMIN', actions)]
 
+    ### IRequestFilter methods
+    def pre_process_request(self, req, handler):
+        return handler
+
+    def post_process_request(self, req, template, data, content_type):
+        """Hook into requests that change the user database.
+
+        When the user database changes, we must update our auth files.
+        """
+        if req.path_info == '/admin/general/perm':
+            RepositoryManager(self.env).update_auth_files()
+
+        return template, data, content_type
+
     ### IRequestHandler methods
     def match_request(self, req):
         match = re.match(r'^/repository(/(\w+))?(/(\w+))?', req.path_info)
@@ -49,7 +64,6 @@ class RepositoryManagerModule(Component):
             return True
 
     def process_request(self, req):
-        RepositoryManager(self.env).update_auth_files()
         action = req.args.get('action', 'list')
         if action == 'list':
             req.redirect(req.href.browser())

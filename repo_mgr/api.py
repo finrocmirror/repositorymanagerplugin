@@ -144,6 +144,7 @@ class RepositoryManager(Component):
                  (id, 'owner', repo['owner'])] + roles)
             self.manager.reload_repositories()
         self.manager.get_repository(repo['name']).sync(None, True)
+        self.update_auth_files()
 
     def fork_local(self, repo):
         """Fork a local repository.
@@ -180,6 +181,7 @@ class RepositoryManager(Component):
                  (id, 'origin', origin.id)])
             self.manager.reload_repositories()
         self.manager.get_repository(repo['name']).sync(None, True)
+        self.update_auth_files()
 
     def modify(self, repo, data):
         """Modify an existing repository."""
@@ -192,6 +194,7 @@ class RepositoryManager(Component):
                 [(data['name'], repo.id, 'name'),
                  (data['dir'], repo.id, 'dir')])
             self.manager.reload_repositories()
+        self.update_auth_files()
 
     def remove(self, repo, delete):
         """Remove an existing repository.
@@ -205,6 +208,7 @@ class RepositoryManager(Component):
             self.manager.reload_repositories()
         if delete:
             shutil.rmtree(repo.directory)
+        self.update_auth_files()
 
     def add_role(self, repo, role, subject):
         """Add a role for the given repository."""
@@ -212,6 +216,7 @@ class RepositoryManager(Component):
         convert_managed_repository(self.env, repo)
         setattr(repo, role, getattr(repo, role) | set([subject]))
         self._update_roles_in_db(repo)
+        self.update_auth_files()
 
     def revoke_roles(self, repo, roles):
         """Revoke a list or `role, subject` pairs."""
@@ -221,6 +226,7 @@ class RepositoryManager(Component):
             config = config - set([subject])
             setattr(repo, role, getattr(repo, role) - set([subject]))
         self._update_roles_in_db(repo)
+        self.update_auth_files()
 
     def update_auth_files(self):
         """Rewrites all configured auth files for all managed
