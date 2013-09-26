@@ -192,7 +192,8 @@ class RepositoryManager(Component):
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
                 [(data['name'], repo.id, 'name'),
-                 (data['dir'], repo.id, 'dir')])
+                 (data['dir'], repo.id, 'dir'),
+                 (data['owner'], repo.id, 'owner')])
             self.manager.reload_repositories()
         self.update_auth_files()
 

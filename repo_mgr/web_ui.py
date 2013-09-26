@@ -37,8 +37,11 @@ class RepositoryManagerModule(Component):
 
     ### IPermissionRequestor methods
     def get_permission_actions(self):
-        actions = ['REPOSITORY_CREATE', 'REPOSITORY_FORK']
-        return actions + [('REPOSITORY_ADMIN', actions)]
+        return ['REPOSITORY_FORK',
+                ('REPOSITORY_CREATE', ['REPOSITORY_FORK']),
+                ('REPOSITORY_ADMIN', ['REPOSITORY_CREATE', 'BROWSER_VIEW',
+                                      'FILE_VIEW', 'LOG_VIEW',
+                                      'CHANGESET_VIEW'])]
 
     ### IRequestFilter methods
     def pre_process_request(self, req, handler):
@@ -86,10 +89,6 @@ class RepositoryManagerModule(Component):
             self._process_modify_request(req, data)
         elif action == 'remove':
             self._process_remove_request(req, data)
-
-        possible_owners = None
-        if 'REPOSITORY_ADMIN' in req.perm:
-            possible_owners = {u[0] for u in self.env.get_known_users()}
 
 #        add_stylesheet(req, 'common/css/browser.css')
         add_stylesheet(req, 'common/css/admin.css')
@@ -168,12 +167,12 @@ class RepositoryManagerModule(Component):
 
         rm = RepositoryManager(self.env)
         if req.args.get('modify'):
-            if self._check_and_update_repository(req, new):
+            if self._check_and_update_repository(req, new, repo):
                 rm.modify(repo, new)
                 link = tag.a(repo.reponame, href=req.href.browser(new['name']))
                 add_notice(req, tag_('The repository "%(link)s" has been '
                                      'modified.', link=link))
-                req.redirect(req.href.repository())
+                req.redirect(req.href(req.path_info))
         elif self._process_role_adding(req, repo):
             req.redirect(req.href(req.path_info))
         elif req.args.get('revoke'):
@@ -190,12 +189,14 @@ class RepositoryManagerModule(Component):
             LoginModule(self.env)._redirect_back(req)
 
         repo_link = tag.a(repo.reponame, href=req.href.browser(repo.reponame))
+        possible_maintainers = self._get_possible_maintainers(req)
         data.update({'title': tag_("Modify Repository %(link)s",
                                    link=repo_link),
                      'repository': repo,
                      'new': new,
                      'users': self._get_users(),
-                     'groups': self._get_groups()})
+                     'groups': self._get_groups(),
+                     'possible_maintainers': possible_maintainers})
 
     def _process_remove_request(self, req, data):
         """Remove an existing repository."""
@@ -253,7 +254,7 @@ class RepositoryManagerModule(Component):
                                  link=link))
             req.redirect(req.href(req.path_info))
 
-    def _check_and_update_repository(self, req, repo):
+    def _check_and_update_repository(self, req, repo, old_repo=None):
         """Check if a repository is valid, does not already exist,
         update the dict and add a warning message otherwise.
         """
@@ -264,10 +265,11 @@ class RepositoryManagerModule(Component):
         base_directory = self._get_base_directory(repo['type'])
         directory = os.path.join(base_directory, repo['dir'])
 
-        if os.path.lexists(directory):
-            add_warning(req, _('Directory "%(name)s" already exists',
-                               name=directory))
-            return False
+        if not old_repo or old_repo.directory != directory:
+            if os.path.lexists(directory):
+                add_warning(req, _('Directory "%(name)s" already exists',
+                                   name=directory))
+                return False
 
         rap = RepositoryAdminPanel(self.env)
         prefixes = [os.path.join(self.env.path, prefix)
@@ -280,10 +282,11 @@ class RepositoryManagerModule(Component):
             return False
 
         rm = RepositoryManager(self.env)
-        if rm.get_repository(repo['name']):
-            add_warning(req, _('Repository "%(name)s" already exists',
-                               name=repo['name']))
-            return False
+        if not old_repo or old_repo.reponame != repo['name']:
+            if rm.get_repository(repo['name']):
+                add_warning(req, _('Repository "%(name)s" already exists',
+                                   name=repo['name']))
+                return False
 
         repo.update({'dir': directory})
         return True
@@ -295,6 +298,10 @@ class RepositoryManagerModule(Component):
         if 'REPOSITORY_ADMIN' in req.perm:
             return {u[0] for u in self.env.get_known_users()}
         return None
+
+    def _get_possible_maintainers(self, req):
+        """Get the list of valid maintainers."""
+        return {u[0] for u in self.env.get_known_users()}
 
     def _get_users(self):
         """Get the list of known users."""

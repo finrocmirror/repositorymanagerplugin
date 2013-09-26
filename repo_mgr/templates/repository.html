@@ -17,7 +17,7 @@
       <py:def function="optional_dropdown_list(label, name, default, options)">
         <label py:if="options">$label:
           <select size="1" name="$name">
-            <option py:for="option in options" value="$option" selected="${option == default or None}">$option</option>
+            <option py:for="option in sorted(options)" value="$option" selected="${option == default or None}">$option</option>
           </select>
         </label>
       </py:def>
@@ -30,7 +30,7 @@
           </select>
         </label>
         <label py:if="not restrict_dir">Directory: <input type="text" name="${prefix + 'dir'}" value="$data.dir" /></label>
-        ${optional_dropdown_list("Owner", prefix + 'owner', data.owner, sorted(possible_owners))}
+        ${optional_dropdown_list("Owner", prefix + 'owner', data.owner, possible_owners)}
       </py:def>
 
       <py:choose test="action">
