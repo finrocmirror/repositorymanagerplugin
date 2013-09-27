@@ -15,11 +15,14 @@
       <h1>$title</h1>
      
       <py:def function="optional_dropdown_list(label, name, default, options)">
-        <label py:if="options">$label:
-          <select size="1" name="$name">
-            <option py:for="option in sorted(options)" value="$option" selected="${option == default or None}">$option</option>
-          </select>
-        </label>
+        <py:choose>
+          <label py:when="options">$label:
+            <select size="1" name="$name">
+              <option py:for="option in sorted(options)" value="$option" selected="${option == default or None}">$option</option>
+            </select>
+          </label>
+          <input py:otherwise="" type="hidden" name="$name" value="$default" />
+        </py:choose>
       </py:def>
 
       <py:def function="main_repository_fields(data, prefix, select_type)">

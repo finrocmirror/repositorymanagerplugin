@@ -173,12 +173,13 @@ class RepositoryManager(Component):
 
         with self.env.db_transaction as db:
             id = self.manager.get_repository_id(repo['name'])
+            roles = list((id, role, '') for role in self.roles)
             db.executemany(
                 "INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)",
                 [(id, 'dir', repo['dir']),
                  (id, 'type', repo['type']),
                  (id, 'owner', repo['owner']),
-                 (id, 'origin', origin.id)])
+                 (id, 'origin', origin.id)] + roles)
             self.manager.reload_repositories()
         self.manager.get_repository(repo['name']).sync(None, True)
         self.update_auth_files()

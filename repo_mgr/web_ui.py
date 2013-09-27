@@ -138,7 +138,7 @@ class RepositoryManagerModule(Component):
         """Fork an existing repository."""
         origin_name = req.args.get('local_origin', req.args.get('reponame'))
         local_fork = self._get_repository_data_from_request(req, 'local_')
-        local_fork['origin'] = req.args.get('local_origin')
+        local_fork['origin'] = origin_name
 
         if req.args.get('fork_local'):
             origin = self._get_checked_repository(req, local_fork['origin'],
