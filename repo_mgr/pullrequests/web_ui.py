@@ -65,10 +65,6 @@ class PullrequestModule(Component):
             type.value = -1
             type.insert()
 
-    ### IPermissionRequestor methods
-    def get_permission_actions(self):
-        return ['PULLREQUEST_CREATE']
-
     ### IRequestFilter methods
     def pre_process_request(self, req, handler):
         return handler
@@ -161,7 +157,7 @@ class PullrequestModule(Component):
          * Add the repository as is must be looked up via the used path
            and is not yet known to the ticket.
         """
-        req.perm.require('PULLREQUEST_CREATE')
+        req.perm.require('TICKET_CREATE')
 
         rm = RepositoryManager(self.env)
         reponame, repo, path = rm.get_repository_by_path(req.args.get('path'))
@@ -255,11 +251,12 @@ class BrowserModule(Component):
         if 'BROWSER_VIEW' in req.perm and re.match(r'^/browser', req.path_info):
             rm = RepositoryManager(self.env)
             path = req.args.get('path', '/')
-            reponame, repos, path = rm.get_repository_by_path(path)
-            if repos:
+            reponame, repo, path = rm.get_repository_by_path(path)
+            if repo:
                 try:
-                    convert_forked_repository(self.env, repos)
-                    if 'PULLREQUEST_CREATE' in req.perm:
+                    convert_forked_repository(self.env, repo)
+                    allowed = set([repo.owner]) | repo.maintainer
+                    if 'TICKET_CREATE' in req.perm and req.authname in allowed:
                         rev = req.args.get('rev')
                         href = req.href.newpullrequest(reponame, pr_srcrev=rev)
                         add_ctxtnav(req, _("Open Pull Request"), href)
