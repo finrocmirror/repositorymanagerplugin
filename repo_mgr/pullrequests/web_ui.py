@@ -1,7 +1,6 @@
 from ..api import *
 
 from trac.core import *
-from trac.perm import IPermissionRequestor
 from trac.web import IRequestHandler, IRequestFilter
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_notice, \
                             add_warning, add_script, add_stylesheet
@@ -9,6 +8,7 @@ from trac.versioncontrol.web_ui import ChangesetModule
 from trac.versioncontrol.diff import get_diff_options
 from trac.resource import ResourceNotFound
 from trac.ticket.web_ui import TicketModule
+from trac.ticket.api import ITicketManipulator
 from trac.ticket.model import Type
 from trac.util.translation import _
 from trac.config import Option
@@ -34,8 +34,8 @@ class PullrequestModule(Component):
     workflow. 
     """
 
-    implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
-               ITemplateProvider)
+    implements(IRequestHandler, IRequestFilter, ITemplateProvider,
+               ITicketManipulator)
 
     cf_srcrepo = Option('ticket-custom', 'pr_srcrepo', 'text')
     cf_srcrepo = Option('ticket-custom', 'pr_srcrepo.label',
@@ -97,8 +97,7 @@ class PullrequestModule(Component):
                                   if not re.match(r'^pr_', field['name']))
 
             if ticket['type'] == 'pull request':
-                data['fields'] = list(self._filter_ticket_types(data['fields'],
-                                                                True))
+                self._filter_ticket_fields(data, True)
 
                 repository = data.get('pr_srcrepo')
                 if not repository:
@@ -131,8 +130,7 @@ class PullrequestModule(Component):
                     template = template.replace('ticket', 'pullrequest', 1)
 
             else:
-                data['fields'] = list(self._filter_ticket_types(data['fields'],
-                                                                False))
+                self._filter_ticket_fields(data, False)
 
         return template, data, content_type
 
@@ -167,9 +165,6 @@ class PullrequestModule(Component):
         req.args['pr_srcrev'] = req.args.get('pr_srcrev',
                                              repo.get_youngest_rev())
 
-        # TODO
-        # hier muss noch die sache mit den maintainern rein.
-
         tm = TicketModule(self.env)
         template, data, content_type = tm.process_request(req)
 
@@ -186,6 +181,25 @@ class PullrequestModule(Component):
         from pkg_resources import resource_filename
         return [('hw', resource_filename(__name__, 'htdocs'))]
 
+    ### ITicketManipulator methods
+    def prepare_ticket(self, req, ticket, fields, actions):
+        pass
+
+    def validate_ticket(self, req, ticket):
+        if ticket['type'] == 'pull request':
+            rm = RepositoryManager(self.env)
+            repo = rm.get_repository(ticket['pr_srcrepo'], True)
+
+
+
+            if ticket['owner'] == '< default >':
+                ticket['owner'] = repo.owner
+            cc = set(ticket['cc'].replace(',', ' ').split())
+            cc |= set([repo.owner]) | repo.maintainer
+            cc -= set([ticket['owner']])
+            ticket['cc'] = ','.join(cc)
+        return []
+
     ### Private methods
     def _filter_ticket_types(self, fields, only_pull_request):
         """Remove 'pull request' from the types or make it the only option."""
@@ -198,6 +212,18 @@ class PullrequestModule(Component):
                     field['options'] = [option for option in field['options']
                                         if option != 'pull request']
             yield field
+
+    def _filter_ticket_fields(self, data, is_pull_request):
+        fields = self._filter_ticket_types(data['fields'], is_pull_request)
+        if is_pull_request:
+            hidden_fields = ('component', 'owner')
+            fields = list(field for field in fields
+                          if not field['name'] in hidden_fields)
+            data['fields'] = fields
+            data['fields_map'] = dict((field['name'], i)
+                                      for i, field in enumerate(fields))
+        else:
+            data['fields'] = list(fields)
 
     def _render_diff_html(self, req, data):
         """Use Trac's rendering to show the changes in the pull request.

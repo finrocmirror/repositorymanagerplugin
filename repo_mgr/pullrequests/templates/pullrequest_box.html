@@ -69,7 +69,7 @@ Arguments:
       v_reporter = reporter_link if defined('reporter_link') else authorinfo(ticket.reporter);
       v_owner = (owner_link if defined('owner_link') else authorinfo(ticket.owner)) if ticket.owner else ''
       ">
-      <th id="h_reporter" class="${classes(missing=not v_reporter)}">Reported by:</th>
+      <th id="h_reporter" class="${classes(missing=not v_reporter)}">Requested by:</th>
       <td headers="h_reporter" class="searchable">$v_reporter</td>
       <th id="h_owner" class="${classes(missing=not v_owner)}">Owned by:</th>
       <td headers="h_owner">$v_owner</td>
