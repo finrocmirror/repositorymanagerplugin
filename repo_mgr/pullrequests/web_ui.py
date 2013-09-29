@@ -186,11 +186,32 @@ class PullrequestModule(Component):
         pass
 
     def validate_ticket(self, req, ticket):
+        errors = []
         if ticket['type'] == 'pull request':
             rm = RepositoryManager(self.env)
             repo = rm.get_repository(ticket['pr_srcrepo'], True)
+            convert_forked_repository(self.env, repo)
 
+            if rm.get_repository(ticket['pr_dstrepo'], True) != repo.origin:
+                msg = _("Pull requests must go from a fork to its origin.")
+                errors.append((None, msg))
 
+            src_rev_in_src = repo.has_node('', ticket['src_rev'])
+            src_rev_in_dst = repo.origin.has_node('', ticket['src_rev'])
+            dst_rev_in_src = repo.has_node('', ticket['src_rev'])
+            dst_rev_in_dst = repo.origin.has_node('', ticket['src_rev'])
+
+            if not src_rev_in_src:
+                msg = _("Source revision must exist in source repository.")
+                errors.append((None, msg))
+
+            if not src_rev_in_dst or ticket['status'] == 'accepted':
+                msg = _("Revision is already pulled but request not accepted.")
+                errors.append((None, msg))
+
+            if not (dst_rev_in_src and dst_rev_in_dst):
+                msg = _("Destination revision must exist in both repositories.")
+                errors.append((None, msg))
 
             if ticket['owner'] == '< default >':
                 ticket['owner'] = repo.owner
@@ -198,7 +219,7 @@ class PullrequestModule(Component):
             cc |= set([repo.owner]) | repo.maintainer
             cc -= set([ticket['owner']])
             ticket['cc'] = ','.join(cc)
-        return []
+        return errors
 
     ### Private methods
     def _filter_ticket_types(self, fields, only_pull_request):
