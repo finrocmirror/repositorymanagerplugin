@@ -136,7 +136,7 @@ class RepositoryManager(Component):
 
         with self.env.db_transaction as db:
             id = self.manager.get_repository_id(repo['name'])
-            roles = list((id, role, '') for role in self.roles)
+            roles = list((id, role + 's', '') for role in self.roles)
             db.executemany(
                 "INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)",
                 [(id, 'dir', repo['dir']),
@@ -173,7 +173,7 @@ class RepositoryManager(Component):
 
         with self.env.db_transaction as db:
             id = self.manager.get_repository_id(repo['name'])
-            roles = list((id, role, '') for role in self.roles)
+            roles = list((id, role + 's', '') for role in self.roles)
             db.executemany(
                 "INSERT INTO repository (id, name, value) VALUES (%s, %s, %s)",
                 [(id, 'dir', repo['dir']),
@@ -216,7 +216,8 @@ class RepositoryManager(Component):
         """Add a role for the given repository."""
         assert role in self.roles
         convert_managed_repository(self.env, repo)
-        setattr(repo, role, getattr(repo, role) | set([subject]))
+        setattr(repo, role + 's',
+                getattr(repo, role + 's') | set([subject]))
         self._update_roles_in_db(repo)
         self.update_auth_files()
 
@@ -224,9 +225,10 @@ class RepositoryManager(Component):
         """Revoke a list or `role, subject` pairs."""
         convert_managed_repository(self.env, repo)
         for role, subject in roles:
-            config = getattr(repo, role)
+            config = getattr(repo, role + 's')
             config = config - set([subject])
-            setattr(repo, role, getattr(repo, role) - set([subject]))
+            setattr(repo, role + 's',
+                    getattr(repo, role + 's') - set([subject]))
         self._update_roles_in_db(repo)
         self.update_auth_files()
 
@@ -254,9 +256,9 @@ class RepositoryManager(Component):
 
             groups = set()
             for repo in all_repositories:
-                groups |= {name for name in repo.maintainer if name[0] == '@'}
-                groups |= {name for name in repo.writer if name[0] == '@'}
-                groups |= {name for name in repo.reader if name[0] == '@'}
+                groups |= {name for name in repo.maintainers if name[0] == '@'}
+                groups |= {name for name in repo.writers if name[0] == '@'}
+                groups |= {name for name in repo.readers if name[0] == '@'}
 
             authz.add_section('groups')
             for group in groups:
@@ -268,8 +270,8 @@ class RepositoryManager(Component):
             for repo in all_repositories:
                 section = repo.reponame + ':/'
                 authz.add_section(section)
-                r = (set([repo.owner]) | repo.maintainer |
-                     repo.writer | repo.reader)
+                r = (set([repo.owner]) | repo.maintainers |
+                     repo.writers | repo.readers)
 
                 def apply_user_list(users, action):
                     if not users:
@@ -326,7 +328,8 @@ class RepositoryManager(Component):
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
-                [(','.join(getattr(repo, r)), repo.id, r) for r in self.roles])
+                [(','.join(getattr(repo, role + 's')), repo.id, role + 's')
+                 for role in self.roles])
 
 def convert_managed_repository(env, repo):
     """Convert a given repository into a `ManagedRepository`."""
@@ -348,14 +351,14 @@ def convert_managed_repository(env, repo):
         type = None
         is_forkable = False
         directory = None
-        maintainer = set()
-        writer = set()
-        reader = set()
+        maintainers = set()
+        writers = set()
+        readers = set()
 
     def _get_role(db, role):
         result = db("""SELECT value FROM repository
                        WHERE name = '%s' AND id = %d
-                       """ % (role, repo.id))[0][0]
+                       """ % (role + 's', repo.id))[0][0]
         if result:
             return set(result.split(','))
         return set()
@@ -372,7 +375,8 @@ def convert_managed_repository(env, repo):
             if not repo.owner:
                 raise TracError(_("Not a managed repository"))
             for role in rm.roles:
-                setattr(repo, role, getattr(repo, role) | _get_role(db, role))
+                setattr(repo, role + 's',
+                        getattr(repo, role + 's') | _get_role(db, role))
 
         info = trac_rm.get_all_repositories().get(repo.reponame)
         repo.type = info['type']

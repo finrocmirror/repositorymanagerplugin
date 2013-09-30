@@ -302,7 +302,7 @@ class BrowserModule(Component):
             if repo:
                 try:
                     convert_forked_repository(self.env, repo)
-                    allowed = set([repo.owner]) | repo.maintainer
+                    allowed = set([repo.owner]) | repo.maintainers
                     if 'TICKET_CREATE' in req.perm and req.authname in allowed:
                         rev = req.args.get('rev')
                         href = req.href.newpullrequest(reponame, pr_srcrev=rev)
