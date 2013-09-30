@@ -27,6 +27,7 @@ setup(
         'trac.plugins': [
             'repo_mgr.web_ui = repo_mgr.web_ui',
             'repo_mgr.pullrequests.web_ui = repo_mgr.pullrequests.web_ui',
+            'repo_mgr.pullrequests.api = repo_mgr.pullrequests.api',
             'repo_mgr.versioncontrol.svn = repo_mgr.versioncontrol.svn',
             'repo_mgr.versioncontrol.hg = repo_mgr.versioncontrol.hg',
         ]

@@ -1,5 +1,7 @@
 from ..api import *
 
+from api import *
+
 from trac.core import *
 from trac.web import IRequestHandler, IRequestFilter
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_notice, \
@@ -9,7 +11,7 @@ from trac.versioncontrol.diff import get_diff_options
 from trac.resource import ResourceNotFound
 from trac.ticket.web_ui import TicketModule
 from trac.ticket.api import ITicketManipulator
-from trac.ticket.model import Type
+from trac.ticket.model import Type, Resolution
 from trac.util.translation import _
 from trac.config import Option
 
@@ -56,14 +58,25 @@ class PullrequestModule(Component):
         Checks if the Type enum contains 'pull request' and otherwise
         adds it with priority -1. That should somehow mark it *special*
         when looked at in the admin panel.
+
+        The same way, to new resolutions are added.
         """
         try:
-            type = Type(self.env, 'pull request')
+            item = Type(self.env, 'pull request')
         except ResourceNotFound:
-            type = Type(self.env)
-            type.name = 'pull request'
-            type.value = -1
-            type.insert()
+            item = Type(self.env)
+            item.name = 'pull request'
+            item.value = -1
+            item.insert()
+
+        for resolution in ('accepted', 'rejected'):
+            try:
+                item = Resolution(self.env, resolution)
+            except ResourceNotFound:
+                item = Resolution(self.env)
+                item.name = resolution
+                item.value = -1
+                item.insert()
 
     ### IRequestFilter methods
     def pre_process_request(self, req, handler):
@@ -213,10 +226,15 @@ class PullrequestModule(Component):
                 msg = _("Destination revision must exist in both repositories.")
                 errors.append((None, msg))
 
+            prwp = PullRequestWorkflowProxy(self.env)
+            maintainers = prwp.get_maintainers(repo)
             if ticket['owner'] == '< default >':
-                ticket['owner'] = repo.owner
+                if repo.owner in maintainers:
+                    ticket['owner'] = repo.owner
+                else:
+                    ticket['owner'] = None
             cc = set(ticket['cc'].replace(',', ' ').split())
-            cc |= set([repo.owner]) | repo.maintainer
+            cc |= maintainers
             cc -= set([ticket['owner']])
             ticket['cc'] = ','.join(cc)
         return errors
