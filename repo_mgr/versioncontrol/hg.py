@@ -8,6 +8,8 @@ import hglib
 import os
 
 class MercurialConnector(Component):
+    """Add support for creating and managing HG repositories."""
+
     implements(IAdministrativeRepositoryConnector)
 
     def get_supported_types(self):

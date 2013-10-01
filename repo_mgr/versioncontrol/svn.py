@@ -14,6 +14,8 @@ from libsvn.repos import *
 import pysvn
 
 class SubversionConnector(Component):
+    """Add support for creating and managing SVN repositories."""
+
     implements(IAdministrativeRepositoryConnector)
 
     svn_authz_file = PathOption('repository-manager', 'svn_authz_file',

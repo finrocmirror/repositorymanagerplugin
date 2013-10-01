@@ -19,7 +19,7 @@ import os
 import re
 
 class PullrequestModule(Component):
-    """Provide special ticket type: pull request
+    """Provide special ticket type: pull request.
 
     This module mainly acts as a filter for tickets, adding and handling
     a special ticket type: pull requests.
