@@ -35,6 +35,13 @@ class RepositoryManagerModule(Component):
                                      elements.
                                      """)
 
+    restrict_forks = BoolOption('repository-manager', 'restrict_forks', False,
+                                doc="""Restrict users to one fork per
+                                       repository with fixed name
+                                       `username/reponame`. `REPOSITORY_ADMIN`
+                                       can still fork without restrictions.
+                                       """)
+
     ### IPermissionRequestor methods
     def get_permission_actions(self):
         return ['REPOSITORY_FORK',
@@ -59,7 +66,7 @@ class RepositoryManagerModule(Component):
 
     ### IRequestHandler methods
     def match_request(self, req):
-        match = re.match(r'^/repository(/(\w+))?(/(\w+))?', req.path_info)
+        match = re.match(r'^/repository(/(\w+))?(/(.+))?', req.path_info)
         if match:
             _, action, _, reponame = match.groups()
             req.args['action'] = action or 'list'
@@ -73,6 +80,7 @@ class RepositoryManagerModule(Component):
 
         data = {'action': action,
                 'restrict_dir': self.restrict_dir,
+                'restrict_forks': self.restrict_forks,
                 'possible_owners': self._get_possible_owners(req),
                 'referer': req.args.get('referer', req.get_header('Referer')),
                 'unicode_to_base64': unicode_to_base64}
@@ -136,7 +144,15 @@ class RepositoryManagerModule(Component):
 
     def _process_fork_request(self, req, data):
         """Fork an existing repository."""
+        rm = RepositoryManager(self.env);
         origin_name = req.args.get('local_origin', req.args.get('reponame'))
+
+        if self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm:
+            name = req.authname + '/' + origin_name
+            if rm.get_repository(name):
+                req.redirect(req.href.browser(name))
+            req.args['local_name'] = name
+
         local_fork = self._get_repository_data_from_request(req, 'local_')
         local_fork['origin'] = origin_name
 
@@ -144,10 +160,10 @@ class RepositoryManagerModule(Component):
             origin = self._get_checked_repository(req, local_fork['origin'],
                                                   False, 'REPOSITORY_FORK')
             local_fork.update({'type': origin.type})
-            rm = RepositoryManager(self.env);
             self._create(req, local_fork, rm.fork_local)
 
-        data.update({'title': _("Fork Repository %(name)s", name=origin_name),
+        repo_link = tag.a(origin_name, href=req.href.browser(origin_name))
+        data.update({'title': tag_("Fork Repository %(link)s", link=repo_link),
                      'local_fork': local_fork})
 
     def _process_modify_request(self, req, data):

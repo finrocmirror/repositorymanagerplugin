@@ -9,7 +9,12 @@
       <div>
         ${optional_dropdown_list("Origin", "local_origin", local_fork.origin, forkable_repositories)}
       </div>
-      ${main_repository_fields(local_fork, 'local_', False)}
+      <py:choose>
+        <py:when test="not restrict_forks">
+          ${main_repository_fields(local_fork, 'local_', False)}
+        </py:when>
+        <input py:otherwise="" type="hidden" name="local_name" value="$local_fork.name" />
+      </py:choose>
       <input type="submit" name="fork_local" value="${_('Create Forked Repository')}" />
       <p class="help">
         Fork an existing repository within this Trac instance.
