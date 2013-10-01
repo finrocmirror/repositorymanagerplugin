@@ -42,13 +42,13 @@
       <tbody>
         <tr>
           <td py:if="repository.is_forkable">
-            ${selectable_list(repository.maintainer, False, possible_maintainers, None, 'maintainer')}
+            ${selectable_list(repository.maintainers, False, possible_maintainers, None, 'maintainer')}
           </td>
           <td>
-            ${selectable_list(repository.writer, True, users, groups, 'writer')}
+            ${selectable_list(repository.writers, True, users, groups, 'writer')}
           </td>
           <td>
-            ${selectable_list(repository.reader, True, users, groups, 'reader')}
+            ${selectable_list(repository.readers, True, users, groups, 'reader')}
           </td>
         </tr>
       </tbody>
