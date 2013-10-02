@@ -192,7 +192,7 @@ class RepositoryManagerModule(Component):
                 link = tag.a(repo.reponame, href=req.href.browser(new['name']))
                 add_notice(req, tag_('The repository "%(link)s" has been '
                                      'modified.', link=link))
-                req.redirect(req.href(req.path_info))
+                req.redirect(req.href.repository('modify', new['name']))
         elif self._process_role_adding(req, repo):
             req.redirect(req.href(req.path_info))
         elif req.args.get('revoke'):
