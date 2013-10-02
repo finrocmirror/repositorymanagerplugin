@@ -349,44 +349,14 @@ def convert_managed_repository(env, repo):
         id = None
         owner = None
         type = None
+        is_fork = False
         is_forkable = False
         directory = None
         maintainers = set()
         writers = set()
         readers = set()
 
-    def _get_role(db, role):
-        result = db("""SELECT value FROM repository
-                       WHERE name = '%s' AND id = %d
-                       """ % (role + 's', repo.id))[0][0]
-        if result:
-            return set(result.split(','))
-        return set()
-
-    if repo.__class__ is not ManagedRepository:
-        repo.__class__ = ManagedRepository
-        trac_rm = TracRepositoryManager(env)
-        repo.id = trac_rm.get_repository_id(repo.reponame)
-        rm = RepositoryManager(env)
-        with env.db_transaction as db:
-            repo.owner = db("""SELECT value FROM repository
-                               WHERE name = 'owner' AND id = %d
-                               """ % repo.id)[0][0]
-            if not repo.owner:
-                raise TracError(_("Not a managed repository"))
-            for role in rm.roles:
-                setattr(repo, role + 's',
-                        getattr(repo, role + 's') | _get_role(db, role))
-
-        info = trac_rm.get_all_repositories().get(repo.reponame)
-        repo.type = info['type']
-        repo.is_forkable = repo.type in rm .get_forkable_types()
-        repo.directory = info['dir']
-
-def convert_forked_repository(env, repo):
-    """Convert a given repository into a `ForkedRepository`."""
-
-    class ForkedRepository(repo.__class__):
+    class ForkedRepository(ManagedRepository):
         """A local fork of a `ManagedRepository`.
 
         This repository class inherits from the original class of the
@@ -422,25 +392,50 @@ def convert_forked_repository(env, repo):
 
             return None
 
-    convert_managed_repository(env, repo)
-    if repo.__class__ is not ForkedRepository:
-        repo.__class__ = ForkedRepository
+    def _get_role(db, role):
+        """Get the set of users that have the given `role` on this
+        repository.
+        """
+        result = db("""SELECT value FROM repository
+                       WHERE name = '%s' AND id = %d
+                       """ % (role + 's', repo.id))[0][0]
+        if result:
+            return set(result.split(','))
+        return set()
+
+    if repo.__class__ is not ManagedRepository:
+        repo.__class__ = ManagedRepository
+        trac_rm = TracRepositoryManager(env)
+        repo.id = trac_rm.get_repository_id(repo.reponame)
+        rm = RepositoryManager(env)
+        with env.db_transaction as db:
+            repo.owner = db("""SELECT value FROM repository
+                               WHERE name = 'owner' AND id = %d
+                               """ % repo.id)[0][0]
+            if not repo.owner:
+                raise TracError(_("Not a managed repository"))
+            for role in rm.roles:
+                setattr(repo, role + 's',
+                        getattr(repo, role + 's') | _get_role(db, role))
+
+        info = trac_rm.get_all_repositories().get(repo.reponame)
+        repo.type = info['type']
+        repo.is_forkable = repo.type in rm .get_forkable_types()
+        repo.directory = info['dir']
+
         with env.db_transaction as db:
             result = db("""SELECT value FROM repository
                            WHERE name = 'name' AND
                                  id = (SELECT value FROM repository
                                        WHERE name = 'origin' AND id = %d)
                            """ % repo.id)
-            if not result:
-                raise TracError(_("Not a forked repository"))
-
-            trac_rm = TracRepositoryManager(env)
-            repo.origin = trac_rm.get_repository(result[0][0])
-            if repo.origin is None:
-                raise TracError(_("Origin of previously forked repository "
-                                  "does not exist anymore"))
-
-    assert repo.origin
+            if result:
+                repo.__class__ = ForkedRepository
+                repo.is_fork = True
+                repo.origin = trac_rm.get_repository(result[0][0])
+                if repo.origin is None:
+                    raise TracError(_("Origin of previously forked repository "
+                                      "does not exist anymore"))
 
 def expand_user_set(env, users):
     all_permissions = PermissionSystem(env).get_all_permissions()

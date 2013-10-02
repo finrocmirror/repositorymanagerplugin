@@ -112,24 +112,24 @@ class PullrequestModule(Component):
             if ticket['type'] == 'pull request':
                 self._filter_ticket_fields(data, True)
 
-                repository = data.get('pr_srcrepo')
-                if not repository:
+                repo = data.get('pr_srcrepo')
+                if not repo:
                     rm = RepositoryManager(self.env)
-                    repository = rm.get_repository(ticket['pr_srcrepo'])
-                    convert_forked_repository(self.env, repository)
+                    repo = rm.get_repository(ticket['pr_srcrepo'], True)
+                    assert repo.is_fork
 
                 srcrev = ticket['pr_srcrev']
                 srcrev_list = []
                 candidate = srcrev
                 while candidate is not None:
                     srcrev_list.append(candidate)
-                    candidate = repository.next_rev(candidate)
+                    candidate = repo.next_rev(candidate)
 
-                dstrev = repository.get_youngest_common_ancestor(srcrev)
-                data.update({'pr_srcrepo': repository,
+                dstrev = repo.get_youngest_common_ancestor(srcrev)
+                data.update({'pr_srcrepo': repo,
                              'pr_srcrev': srcrev,
                              'pr_srcrev_list': srcrev_list,
-                             'pr_dstrepo': repository.origin,
+                             'pr_dstrepo': repo.origin,
                              'pr_dstrev': dstrev})
 
                 self._render_diff_html(req, data)
@@ -172,7 +172,9 @@ class PullrequestModule(Component):
 
         rm = RepositoryManager(self.env)
         reponame, repo, path = rm.get_repository_by_path(req.args.get('path'))
-        convert_forked_repository(self.env, repo)
+        convert_managed_repository(self.env, repo)
+        if not repo.is_fork:
+            raise TracError(_("Repository is not a fork."))
 
         req.args['type'] = 'pull request'
         req.args['pr_srcrev'] = req.args.get('pr_srcrev',
@@ -203,7 +205,7 @@ class PullrequestModule(Component):
         if ticket['type'] == 'pull request':
             rm = RepositoryManager(self.env)
             repo = rm.get_repository(ticket['pr_srcrepo'], True)
-            convert_forked_repository(self.env, repo)
+            assert repo.is_fork
 
             if rm.get_repository(ticket['pr_dstrepo'], True) != repo.origin:
                 msg = _("Pull requests must go from a fork to its origin.")
@@ -319,8 +321,10 @@ class BrowserModule(Component):
             reponame, repo, path = rm.get_repository_by_path(path)
             if repo:
                 try:
-                    convert_forked_repository(self.env, repo)
-                    allowed = set([repo.owner]) | repo.maintainers
+                    convert_managed_repository(self.env, repo)
+                    allowed = set()
+                    if repo.is_fork:
+                        allowed = set([repo.owner]) | repo.maintainers
                     if 'TICKET_CREATE' in req.perm and req.authname in allowed:
                         rev = req.args.get('rev')
                         href = req.href.newpullrequest(reponame, pr_srcrev=rev)

@@ -172,11 +172,7 @@ class RepositoryManagerModule(Component):
 
         restrict_modifications = False
         if self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm:
-            try:
-                convert_forked_repository(self.env, repo)
-                restrict_modifications = True
-            except:
-                pass
+            restrict_modifications = repo.is_fork
 
         base_directory = self._get_base_directory(repo.type)
         prefix_length = len(base_directory)
@@ -396,15 +392,11 @@ class BrowserModule(Component):
                             add_ctxtnav(req, _("Modify"), href)
                             href = req.href.repository('remove', repo.reponame)
                             add_ctxtnav(req, _("Remove"), href)
-                    except:
-                        pass
-
-                    try:
-                        convert_forked_repository(self.env, repository)
-                        origin = repo.origin.reponame
-                        add_ctxtnav(req, _("Forked from %(origin)s",
-                                           origin=origin),
-                                    req.href.browser(origin))
+                        if repo.is_fork:
+                            origin = repo.origin.reponame
+                            add_ctxtnav(req, _("Forked from %(origin)s",
+                                               origin=origin),
+                                        req.href.browser(origin))
                     except:
                         pass
             else:
