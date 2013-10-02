@@ -170,6 +170,14 @@ class RepositoryManagerModule(Component):
         """Modify an existing repository."""
         repo = self._get_checked_repository(req, req.args.get('reponame'))
 
+        restrict_modifications = False
+        if self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm:
+            try:
+                convert_forked_repository(self.env, repo)
+                restrict_modifications = True
+            except:
+                pass
+
         base_directory = self._get_base_directory(repo.type)
         prefix_length = len(base_directory)
         if prefix_length > 0:
@@ -212,7 +220,8 @@ class RepositoryManagerModule(Component):
                      'new': new,
                      'users': self._get_users(),
                      'groups': self._get_groups(),
-                     'possible_maintainers': possible_maintainers})
+                     'possible_maintainers': possible_maintainers,
+                     'restrict_modifications': restrict_modifications})
 
     def _process_remove_request(self, req, data):
         """Remove an existing repository."""
