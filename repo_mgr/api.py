@@ -2,7 +2,9 @@ from trac.core import *
 from trac.versioncontrol.api import RepositoryManager as TracRepositoryManager
 from trac.versioncontrol.svn_authz import AuthzSourcePolicy
 from trac.perm import PermissionSystem
+from trac.util import as_bool
 from trac.util.translation import _
+from trac.config import BoolOption
 
 from ConfigParser import ConfigParser
 
@@ -63,6 +65,15 @@ class RepositoryManager(Component):
     handled by this module. It also implements forking, if the connector
     supports that, which creates instances of `ForkedRepository`.
     """
+
+    owner_as_maintainer = BoolOption('repository-manager',
+                                     'owner_as_maintainer',
+                                     True,
+                                     doc="""If true, the owner will have the
+                                            role of a maintainer, too.
+                                            Otherwise, he will only act as an
+                                            administrator for his repositories.
+                                            """)
 
     connectors = ExtensionPoint(IAdministrativeRepositoryConnector)
 
@@ -179,7 +190,8 @@ class RepositoryManager(Component):
                 [(id, 'dir', repo['dir']),
                  (id, 'type', repo['type']),
                  (id, 'owner', repo['owner']),
-                 (id, 'origin', origin.id)] + roles)
+                 (id, 'origin', origin.id),
+                 (id, 'inherit_readers', True)] + roles)
             self.manager.reload_repositories()
         self.manager.get_repository(repo['name']).sync(None, True)
         self.update_auth_files()
@@ -192,9 +204,7 @@ class RepositoryManager(Component):
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
-                [(data['name'], repo.id, 'name'),
-                 (data['dir'], repo.id, 'dir'),
-                 (data['owner'], repo.id, 'owner')])
+                [(data[key], repo.id, key) for key in data])
             self.manager.reload_repositories()
         self.update_auth_files()
 
@@ -241,6 +251,10 @@ class RepositoryManager(Component):
         for repo in self.manager.get_real_repositories():
             try:
                 convert_managed_repository(self.env, repo)
+                if repo.is_fork and repo.inherit_readers:
+                    repo.readers |= repo.origin.maintainers
+                    if self.owner_as_maintainer:
+                        repo.readers |= set([repo.origin.owner])
                 all_repositories.append(repo)
             except:
                 pass
@@ -325,10 +339,13 @@ class RepositoryManager(Component):
             raise TracError(_("Failed to adjust file modes: " + str(e)))
 
     def _update_roles_in_db(self, repo):
+        roles = {}
+        for role in self.roles:
+            roles[role] = getattr(repo, role + 's') - set([repo.owner])
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
-                [(','.join(getattr(repo, role + 's')), repo.id, role + 's')
+                [(','.join(roles[role]), repo.id, role + 's')
                  for role in self.roles])
 
 def convert_managed_repository(env, repo):
@@ -370,6 +387,7 @@ def convert_managed_repository(env, repo):
         """
 
         origin = None
+        inherit_readers = False
 
         def get_youngest_common_ancestor(self, rev):
             """Goes back in the repositories history starting from
@@ -417,6 +435,8 @@ def convert_managed_repository(env, repo):
             for role in rm.roles:
                 setattr(repo, role + 's',
                         getattr(repo, role + 's') | _get_role(db, role))
+        if rm.owner_as_maintainer:
+            repo.maintainers |= set([repo.owner])
 
         info = trac_rm.get_all_repositories().get(repo.reponame)
         repo.type = info['type']
@@ -429,13 +449,19 @@ def convert_managed_repository(env, repo):
                                  id = (SELECT value FROM repository
                                        WHERE name = 'origin' AND id = %d)
                            """ % repo.id)
-            if result:
-                repo.__class__ = ForkedRepository
-                repo.is_fork = True
-                repo.origin = trac_rm.get_repository(result[0][0])
-                if repo.origin is None:
-                    raise TracError(_("Origin of previously forked repository "
-                                      "does not exist anymore"))
+            if not result:
+                return
+
+            repo.__class__ = ForkedRepository
+            repo.is_fork = True
+            repo.origin = rm.get_repository(result[0][0], True)
+            if repo.origin is None:
+                raise TracError(_("Origin of previously forked repository "
+                                  "does not exist anymore"))
+            result = db("""SELECT value FROM repository
+                           WHERE name = 'inherit_readers' AND id = %d
+                           """ % repo.id)
+            repo.inherit_readers = as_bool(result[0][0])
 
 def expand_user_set(env, users):
     all_permissions = PermissionSystem(env).get_all_permissions()

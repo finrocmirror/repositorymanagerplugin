@@ -228,15 +228,13 @@ class PullrequestModule(Component):
                 msg = _("Destination revision must exist in both repositories.")
                 errors.append((None, msg))
 
-            prwp = PullRequestWorkflowProxy(self.env)
-            maintainers = prwp.get_maintainers(repo)
             if ticket['owner'] == '< default >':
-                if repo.owner in maintainers:
+                if repo.owner in repo.maintainers:
                     ticket['owner'] = repo.owner
                 else:
                     ticket['owner'] = None
             cc = set(ticket['cc'].replace(',', ' ').split())
-            cc |= maintainers
+            cc |= repo.maintainers
             cc -= set([ticket['owner']])
             ticket['cc'] = ','.join(cc)
         return errors

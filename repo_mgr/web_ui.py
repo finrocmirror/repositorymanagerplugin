@@ -8,7 +8,7 @@ from trac.web.chrome import INavigationContributor, ITemplateProvider, \
                             add_ctxtnav, add_stylesheet, \
                             add_notice, add_warning
 from trac.versioncontrol.admin import RepositoryAdminPanel
-from trac.util import is_path_below
+from trac.util import is_path_below, as_bool
 from trac.util.translation import _, tag_
 from trac.util.text import normalize_whitespace, \
                            unicode_to_base64, unicode_from_base64
@@ -183,6 +183,9 @@ class RepositoryManagerModule(Component):
         req.args['type'] = repo.type
         req.args['dir'] = req.args.get('dir', repo.directory[prefix_length:])
         req.args['owner'] = req.args.get('owner', repo.owner)
+        if repo.is_fork:
+            req.args['inherit_readers'] = req.args.get('inherit_readers',
+                                                       repo.inherit_readers)
         new = self._get_repository_data_from_request(req)
 
         rm = RepositoryManager(self.env)
@@ -207,6 +210,10 @@ class RepositoryManagerModule(Component):
                 req.redirect(req.href(req.path_info))
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
+        elif new['inherit_readers'] != repo.inherit_readers:
+            new['dir'] = repo.directory
+            rm.modify(repo, new)
+            req.redirect(req.href(req.path_info))
 
         repo_link = tag.a(repo.reponame, href=req.href.browser(repo.reponame))
         possible_maintainers = self._get_possible_maintainers(req)
@@ -354,7 +361,8 @@ class RepositoryManagerModule(Component):
         return {'name': req.args.get(prefix + 'name'),
                 'type': req.args.get(prefix + 'type'),
                 'dir': normalize_whitespace(directory),
-                'owner': req.args.get(prefix + 'owner', req.authname)}
+                'owner': req.args.get(prefix + 'owner', req.authname),
+                'inherit_readers': as_bool(req.args.get('inherit_readers'))}
 
 class BrowserModule(Component):
     """Add navigation items to the browser."""

@@ -4,7 +4,7 @@ from trac.core import implements, Component
 from trac.ticket.api import TicketSystem, ITicketActionController
 from trac.ticket.model import Resolution
 from trac.util.translation import _, tag_
-from trac.config import BoolOption, OrderedExtensionsOption
+from trac.config import OrderedExtensionsOption
 
 from genshi.builder import tag
 
@@ -35,20 +35,6 @@ class PullRequestWorkflowProxy(Component):
                That is when a ticket is not a pull request.
                """)
 
-    owner_as_maintainer = BoolOption('repository-manager',
-                                     'owner_as_maintainer',
-                                     True,
-                                     doc="""If true, the owner will have the
-                                            role of a maintainer, too.
-                                            Otherwise, he will only act as an
-                                            administrator for his repositories.
-                                            """)
-
-    def get_maintainers(self, repo):
-        if self.owner_as_maintainer:
-            return set([repo.owner]) | repo.maintainers
-        return repo.maintainers
-
     ### ITicketActionController methods
     def get_ticket_actions(self, req, ticket):
         if ticket['type'] != 'pull request':
@@ -61,7 +47,7 @@ class PullRequestWorkflowProxy(Component):
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
-        maintainers = self.get_maintainers(repo)
+        maintainers = repo.maintainers
 
         actions = []
         actions.append((4, 'leave'))

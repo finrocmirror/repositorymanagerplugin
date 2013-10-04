@@ -12,7 +12,7 @@
     </fieldset>
   </form>
 
-  <py:def function="selectable_list(list, anonymous, users, groups, name)">
+  <py:def function="selectable_list(list, anonymous, users, groups, name, readers=False)">
     <div>
       <select size="1" name="$name">
         <option></option>
@@ -26,11 +26,27 @@
         </optgroup>
       </select>
       <input type="submit" name="add_role_$name" value="${_('Add')}" />
+      <py:if test="readers and repository.is_fork">
+        Inherit readers from origin's maintainers:
+        <label><input type="radio" name="inherit_readers" value="1" checked="${new.inherit_readers or None}" onclick="submit('foo')"/>Yes</label>
+        <label><input type="radio" name="inherit_readers" value="0" checked="${not new.inherit_readers or None}" onclick="submit('foo')"/>No</label>
+      </py:if>
     </div>
-    <label py:for="item in sorted(list)">
-      <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" />
-      $item<br />
+    <py:choose test="readers and repository.inherit_readers">
+      <label py:when="True" py:for="item in sorted(list | repository.origin.maintainers)"
+             py:with="disabled = item == repository.owner or not item in list">
+        <span py:strip="item in list" title="Inherited from origin's maintainers">
+          <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" disabled="${disabled or None}" />
+          $item<br />
+        </span>
     </label>
+    <label py:otherwise="" py:for="item in sorted(list)">
+      <span py:strip="item != repository.owner" title="Repository owner">
+        <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" disabled="${item == repository.owner or None}" />
+        $item<br />
+      </span>
+    </label>
+    </py:choose>
   </py:def>
 
   <form method="post">
@@ -48,7 +64,7 @@
             ${selectable_list(repository.writers, True, users, groups, 'writer')}
           </td>
           <td>
-            ${selectable_list(repository.readers, True, users, groups, 'reader')}
+            ${selectable_list(repository.readers, True, users, groups, 'reader', True)}
           </td>
         </tr>
       </tbody>
