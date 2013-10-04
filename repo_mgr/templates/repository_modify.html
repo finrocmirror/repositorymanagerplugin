@@ -61,10 +61,10 @@
             ${selectable_list(repository.maintainers, False, possible_maintainers, None, 'maintainer')}
           </td>
           <td>
-            ${selectable_list(repository.writers, True, users, groups, 'writer')}
+            ${selectable_list(repository.writers | set([repository.owner]), True, users, groups, 'writer')}
           </td>
           <td>
-            ${selectable_list(repository.readers, True, users, groups, 'reader', True)}
+            ${selectable_list(repository.readers | set([repository.owner]), True, users, groups, 'reader', True)}
           </td>
         </tr>
       </tbody>
