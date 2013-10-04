@@ -235,7 +235,7 @@ class PullrequestModule(Component):
                     ticket['owner'] = None
             cc = set(ticket['cc'].replace(',', ' ').split())
             cc |= repo.maintainers
-            cc -= set([ticket['owner']])
+            cc -= set([ticket['owner'], ticket['reporter']])
             ticket['cc'] = ','.join(cc)
         return errors
 
