@@ -280,7 +280,7 @@ class RepositoryManagerModule(Component):
             link = tag.a(repo['name'], href=req.href.browser(repo['name']))
             add_notice(req, tag_('The repository "%(link)s" has been created.',
                                  link=link))
-            req.redirect(req.href(req.path_info))
+            req.redirect(req.href.repository('modify', repo['name']))
 
     def _check_and_update_repository(self, req, repo, old_repo=None):
         """Check if a repository is valid, does not already exist,
