@@ -210,10 +210,12 @@ class RepositoryManagerModule(Component):
                 req.redirect(req.href(req.path_info))
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
-        elif new['inherit_readers'] != repo.inherit_readers:
-            new['dir'] = repo.directory
-            rm.modify(repo, new)
-            req.redirect(req.href(req.path_info))
+
+        if repo.is_fork:
+            if new['inherit_readers'] != repo.inherit_readers:
+                new['dir'] = repo.directory
+                rm.modify(repo, new)
+                req.redirect(req.href(req.path_info))
 
         repo_link = tag.a(repo.reponame, href=req.href.browser(repo.reponame))
         possible_maintainers = self._get_possible_maintainers(req)
