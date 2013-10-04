@@ -205,11 +205,11 @@ class PullrequestModule(Component):
 
     def validate_ticket(self, req, ticket):
         """Check if the pull request properties make sense.
-        
+
         That is:
          * Are the source and destination repositories directly related?
          * Is the source revision still not present in the destination?
-         
+
          Additionally the owner is set to the destination's owner if he
          is a maintainer and the cc field is populated with the
          destination repository's maintainers. 

@@ -380,11 +380,6 @@ def convert_managed_repository(env, repo):
         This repository class inherits from the original class of the
         given repository and adds fields and methods needed by the
         manager and for e.g. pull requests.
-
-        Trying to convert a repository that was not forked via the new
-        `RepositoryManager` raises an exception and can therefore
-        be used to easily check if we are working with a forked
-        repository.
         """
 
         origin = None
