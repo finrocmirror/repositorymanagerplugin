@@ -339,6 +339,7 @@ class RepositoryManager(Component):
             raise TracError(_("Failed to adjust file modes: " + str(e)))
 
     def _update_roles_in_db(self, repo):
+        """Make the current roles persistens in the database."""
         roles = {}
         for role in self.roles:
             roles[role] = getattr(repo, role + 's') - set([repo.owner])
@@ -464,6 +465,7 @@ def convert_managed_repository(env, repo):
             repo.inherit_readers = as_bool(result[0][0])
 
 def expand_user_set(env, users):
+    """Replaces all groups by their users until only users are left."""
     all_permissions = PermissionSystem(env).get_all_permissions()
 
     special_users = set(['anonymous', 'authenticated'])

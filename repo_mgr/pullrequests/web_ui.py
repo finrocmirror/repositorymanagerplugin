@@ -59,7 +59,7 @@ class PullrequestModule(Component):
         adds it with priority -1. That should somehow mark it *special*
         when looked at in the admin panel.
 
-        The same way, to new resolutions are added.
+        The same way, two new resolutions are added.
         """
         try:
             item = Type(self.env, 'pull request')
@@ -198,9 +198,22 @@ class PullrequestModule(Component):
 
     ### ITicketManipulator methods
     def prepare_ticket(self, req, ticket, fields, actions):
+        """Currently not used. Might be a better place for stuff that is
+        now done in `process_request`.
+        """
         pass
 
     def validate_ticket(self, req, ticket):
+        """Check if the pull request properties make sense.
+        
+        That is:
+         * Are the source and destination repositories directly related?
+         * Is the source revision still not present in the destination?
+         
+         Additionally the owner is set to the destination's owner if he
+         is a maintainer and the cc field is populated with the
+         destination repository's maintainers. 
+        """
         errors = []
         if ticket['type'] == 'pull request':
             rm = RepositoryManager(self.env)
@@ -241,7 +254,9 @@ class PullrequestModule(Component):
 
     ### Private methods
     def _filter_ticket_types(self, fields, only_pull_request):
-        """Remove 'pull request' from the types or make it the only option."""
+        """Remove 'pull request' from the types or make it the only
+        option.
+        """
         for field in fields:
             if field['name'] == 'type':
                 if only_pull_request:
@@ -253,6 +268,9 @@ class PullrequestModule(Component):
             yield field
 
     def _filter_ticket_fields(self, data, is_pull_request):
+        """Removes a few fields from the ticket forms in case of pull
+        requests.
+        """
         fields = self._filter_ticket_types(data['fields'], is_pull_request)
         if is_pull_request:
             hidden_fields = ('component', 'owner')

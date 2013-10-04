@@ -343,6 +343,7 @@ class RepositoryManagerModule(Component):
         return result
 
     def _process_role_adding(self, req, repo):
+        """Does all needed calls to `add_role` in `RepositoryManager`."""
         rm = RepositoryManager(self.env)
         for role in rm.roles:
             if req.args.get('add_role_' + role):
