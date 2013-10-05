@@ -12,7 +12,7 @@ from trac.util import is_path_below, as_bool
 from trac.util.translation import _, tag_
 from trac.util.text import normalize_whitespace, \
                            unicode_to_base64, unicode_from_base64
-from trac.config import BoolOption, PathOption
+from trac.config import Option, BoolOption
 
 from genshi.builder import tag
 
@@ -25,16 +25,15 @@ class RepositoryManagerModule(Component):
     implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
                ITemplateProvider)
 
-    base_dir = PathOption('repository-manager', 'base_dir', 'repositories',
-                          doc="""The base folder in which repositories will be
-                                 created.
-                                 """)
+    base_dir = Option('repository-manager', 'base_dir', 'repositories',
+                      doc="""The base folder in which repositories will be
+                             created.
+                             """)
     restrict_dir = BoolOption('repository-manager', 'restrict_dir', True,
                               doc="""Always use the repository name as
                                      directory name. Disables some form
                                      elements.
                                      """)
-
     restrict_forks = BoolOption('repository-manager', 'restrict_forks', False,
                                 doc="""Restrict users to one fork per
                                        repository with fixed name
