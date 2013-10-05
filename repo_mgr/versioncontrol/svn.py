@@ -1,7 +1,7 @@
 from ..api import *
 
 from trac.util.translation import _
-from trac.config import PathOption
+from trac.config import Option, PathOption
 
 from ConfigParser import ConfigParser
 
@@ -26,6 +26,16 @@ class SubversionConnector(Component):
                                        repositories. If not set, no file will
                                        be written.
                                        """)
+    pre_commit_hook = Option('repository-manager', 'svn_pre_commit',
+                             doc="""Path to an executable that should be run
+                                    before a change is committed to any SVN
+                                    repository managed via this plugin.
+                                    """)
+    post_commit_hook = Option('repository-manager', 'svn_post_commit',
+                              doc="""Path to an executable that should be run
+                                     after a change was committed to any SVN
+                                     repository managed via this plugin.
+                                     """)
 
     def get_supported_types(self):
         yield ('svn', 0)
@@ -48,6 +58,12 @@ class SubversionConnector(Component):
             client.import_(layout, 'file://' + repo['dir'],
                            'Initial repository layout')
             shutil.rmtree(layout)
+            if self.pre_commit_hook:
+                os.symlink(os.path.join(self.env.path, self.pre_commit_hook),
+                           os.path.join(repo['dir'], 'hooks/pre-commit'))
+            if self.post_commit_hook:
+                os.symlink(os.path.join(self.env.path, self.post_commit_hook),
+                           os.path.join(repo['dir'], 'hooks/post-commit'))
         except Exception, e:
             raise TracError(_("Failed to initialize repository: ") + str(e))
 
