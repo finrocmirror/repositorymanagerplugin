@@ -18,11 +18,11 @@
         <option></option>
         <option py:if="anonymous" value="anonymous">anonymous</option>
         <option py:if="anonymous" value="authenticated">authenticated</option>
-        <optgroup py:if="users" label="Users">
-          <option py:for="user in sorted(users)" value="$user">$user</option>
-        </optgroup>
         <optgroup py:if="groups" label="Groups">
           <option py:for="group in sorted(groups)" value="@$group">$group</option>
+        </optgroup>
+        <optgroup py:if="users" label="Users">
+          <option py:for="user in sorted(users)" value="$user">$user</option>
         </optgroup>
       </select>
       <input type="submit" name="add_role_$name" value="${_('Add')}" />
