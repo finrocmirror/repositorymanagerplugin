@@ -242,12 +242,9 @@ class PullrequestModule(Component):
                 errors.append((None, msg))
 
             if ticket['owner'] == '< default >':
-                if repo.owner in repo.maintainers:
-                    ticket['owner'] = repo.owner
-                else:
-                    ticket['owner'] = None
+                ticket['owner'] = repo.owner
             cc = set(ticket['cc'].replace(',', ' ').split())
-            cc |= repo.maintainers
+            cc |= repo.maintainers()
             cc -= set([ticket['owner'], ticket['reporter']])
             ticket['cc'] = ','.join(cc)
         return errors
@@ -340,7 +337,7 @@ class BrowserModule(Component):
                     convert_managed_repository(self.env, repo)
                     allowed = set()
                     if repo.is_fork:
-                        allowed = set([repo.owner]) | repo.maintainers
+                        allowed = set([repo.owner]) | repo.maintainers()
                     if 'TICKET_CREATE' in req.perm and req.authname in allowed:
                         rev = req.args.get('rev')
                         href = req.href.newpullrequest(reponame, pr_srcrev=rev)

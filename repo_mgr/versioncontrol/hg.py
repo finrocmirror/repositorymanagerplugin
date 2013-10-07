@@ -33,9 +33,9 @@ class MercurialConnector(Component):
 
     def update_auth_files(self, repositories):
         for repo in repositories:
-            writers = set([repo.owner]) | repo.maintainers | repo.writers
+            writers = repo.maintainers() | repo.writers()
             writers = expand_user_set(self.env, writers)
-            readers = expand_user_set(self.env, writers | repo.readers)
+            readers = expand_user_set(self.env, writers | repo.readers())
 
             hgrc_path = os.path.join(repo.directory, '.hg/hgrc')
 

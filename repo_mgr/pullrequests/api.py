@@ -47,7 +47,7 @@ class PullRequestWorkflowProxy(Component):
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
-        maintainers = repo.maintainers
+        maintainers = repo.maintainers()
 
         actions = []
         actions.append((4, 'leave'))
@@ -96,7 +96,7 @@ class PullRequestWorkflowProxy(Component):
             hints.append(_("The request will be rejected"))
             hints.append(_("Next status will be '%(name)s'", name='closed'))
         if action == 'reassign':
-            maintainers = (set([repo.owner]) | repo.maintainers)
+            maintainers = (set([repo.owner]) | repo.maintainers())
             maintainers -= set([current_owner])
             selected_owner = req.args.get('action_reassign_reassign_owner',
                                           req.authname)

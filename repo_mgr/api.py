@@ -236,8 +236,9 @@ class RepositoryManager(Component):
         """Add a role for the given repository."""
         assert role in self.roles
         convert_managed_repository(self.env, repo)
-        setattr(repo, role + 's',
-                getattr(repo, role + 's') | set([subject]))
+        role_attr = '_' + role + 's'
+        setattr(repo, role_attr,
+                getattr(repo, role_attr) | set([subject]))
         self._update_roles_in_db(repo)
         self.update_auth_files()
 
@@ -245,10 +246,11 @@ class RepositoryManager(Component):
         """Revoke a list or `role, subject` pairs."""
         convert_managed_repository(self.env, repo)
         for role, subject in roles:
-            config = getattr(repo, role + 's')
+            role_attr = '_' + role + 's'
+            config = getattr(repo, role_attr)
             config = config - set([subject])
-            setattr(repo, role + 's',
-                    getattr(repo, role + 's') - set([subject]))
+            setattr(repo, role_attr,
+                    getattr(repo, role_attr) - set([subject]))
         self._update_roles_in_db(repo)
         self.update_auth_files()
 
@@ -261,10 +263,6 @@ class RepositoryManager(Component):
         for repo in self.manager.get_real_repositories():
             try:
                 convert_managed_repository(self.env, repo)
-                if repo.is_fork and repo.inherit_readers:
-                    repo.readers |= repo.origin.maintainers
-                    if self.owner_as_maintainer:
-                        repo.readers |= set([repo.origin.owner])
                 all_repositories.append(repo)
             except:
                 pass
@@ -280,9 +278,9 @@ class RepositoryManager(Component):
 
             groups = set()
             for repo in all_repositories:
-                groups |= {name for name in repo.maintainers if name[0] == '@'}
-                groups |= {name for name in repo.writers if name[0] == '@'}
-                groups |= {name for name in repo.readers if name[0] == '@'}
+                groups |= {name for name in repo.maintainers() if name[0] == '@'}
+                groups |= {name for name in repo.writers() if name[0] == '@'}
+                groups |= {name for name in repo.readers() if name[0] == '@'}
 
             authz.add_section('groups')
             for group in groups:
@@ -294,8 +292,7 @@ class RepositoryManager(Component):
             for repo in all_repositories:
                 section = repo.reponame + ':/'
                 authz.add_section(section)
-                r = (set([repo.owner]) | repo.maintainers |
-                     repo.writers | repo.readers)
+                r = repo.maintainers() | repo.writers() | repo.readers()
 
                 def apply_user_list(users, action):
                     if not users:
@@ -349,10 +346,10 @@ class RepositoryManager(Component):
             raise TracError(_("Failed to adjust file modes: " + str(e)))
 
     def _update_roles_in_db(self, repo):
-        """Make the current roles persistens in the database."""
+        """Make the current roles persistent in the database."""
         roles = {}
         for role in self.roles:
-            roles[role] = getattr(repo, role + 's') - set([repo.owner])
+            roles[role] = getattr(repo, '_' + role + 's')
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
@@ -380,9 +377,21 @@ def convert_managed_repository(env, repo):
         is_fork = False
         is_forkable = False
         directory = None
-        maintainers = set()
-        writers = set()
-        readers = set()
+        _owner_is_maintainer = False
+        _maintainers = set()
+        _writers = set()
+        _readers = set()
+
+        def maintainers(self):
+            if self._owner_is_maintainer:
+                return self._maintainers | set([self.owner])
+            return self._maintainers
+
+        def writers(self):
+            return self._writers | set([self.owner])
+
+        def readers(self):
+            return self._readers | set([self.owner])
 
     class ForkedRepository(ManagedRepository):
         """A local fork of a `ManagedRepository`.
@@ -416,6 +425,12 @@ def convert_managed_repository(env, repo):
 
             return None
 
+        def readers(self):
+            readers = ManagedRepository.readers(self)
+            if self.inherit_readers:
+                return readers | self.origin.maintainers()
+            return readers
+
     def _get_role(db, role):
         """Get the set of users that have the given `role` on this
         repository.
@@ -439,10 +454,10 @@ def convert_managed_repository(env, repo):
             if not repo.owner:
                 raise TracError(_("Not a managed repository"))
             for role in rm.roles:
-                setattr(repo, role + 's',
-                        getattr(repo, role + 's') | _get_role(db, role))
-        if rm.owner_as_maintainer:
-            repo.maintainers |= set([repo.owner])
+                role_attr = '_' + role + 's'
+                setattr(repo, role_attr,
+                        getattr(repo, role_attr) | _get_role(db, role))
+        repo._owner_is_maintainer = rm.owner_as_maintainer
 
         info = trac_rm.get_all_repositories().get(repo.reponame)
         repo.type = info['type']

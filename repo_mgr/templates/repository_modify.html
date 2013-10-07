@@ -12,12 +12,12 @@
     </fieldset>
   </form>
 
-  <py:def function="selectable_list(list, anonymous, users, groups, name, readers=False)">
+  <py:def function="selectable_list(raw_list, implicit_list, allow_meta, users, groups, name, readers=False)">
     <div>
       <select size="1" name="$name">
         <option></option>
-        <option py:if="anonymous" value="anonymous">anonymous</option>
-        <option py:if="anonymous" value="authenticated">authenticated</option>
+        <option py:if="allow_meta" value="anonymous">anonymous</option>
+        <option py:if="allow_meta" value="authenticated">authenticated</option>
         <optgroup py:if="groups" label="Groups">
           <option py:for="group in sorted(groups)" value="@$group">$group</option>
         </optgroup>
@@ -28,25 +28,16 @@
       <input type="submit" name="add_role_$name" value="${_('Add')}" />
       <py:if test="readers and repository.is_fork">
         Inherit readers from origin's maintainers:
-        <label><input type="radio" name="inherit_readers" value="1" checked="${new.inherit_readers or None}" onclick="submit('foo')"/>Yes</label>
-        <label><input type="radio" name="inherit_readers" value="0" checked="${not new.inherit_readers or None}" onclick="submit('foo')"/>No</label>
+        <label><input type="radio" name="inherit_readers" value="1" checked="${new.inherit_readers or None}" onclick="submit()"/>Yes</label>
+        <label><input type="radio" name="inherit_readers" value="0" checked="${not new.inherit_readers or None}" onclick="submit()"/>No</label>
       </py:if>
     </div>
-    <py:choose test="readers and repository.inherit_readers">
-      <label py:when="True" py:for="item in sorted(list | repository.origin.maintainers)"
-             py:with="disabled = item == repository.owner or not item in list">
-        <span py:strip="item in list" title="Inherited from origin's maintainers">
-          <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" disabled="${disabled or None}" />
-          $item<br />
-        </span>
-    </label>
-    <label py:otherwise="" py:for="item in sorted(list)">
-      <span py:strip="item != repository.owner" title="Repository owner">
-        <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" disabled="${item == repository.owner or None}" />
+    <label py:for="item in sorted(raw_list | implicit_list)" py:with="implicitly_included = item not in raw_list">
+      <span py:strip="not implicitly_included" title="Implicitly included">
+        <input type="checkbox" name="selection" value="${'%s:%s' % (unicode_to_base64(name), unicode_to_base64(item))}" disabled="${implicitly_included or None}" />
         $item<br />
       </span>
     </label>
-    </py:choose>
   </py:def>
 
   <form method="post">
@@ -58,13 +49,13 @@
       <tbody>
         <tr>
           <td py:if="repository.is_forkable">
-            ${selectable_list(repository.maintainers, False, possible_maintainers, None, 'maintainer')}
+            ${selectable_list(repository._maintainers, repository.maintainers(), False, possible_maintainers, None, 'maintainer')}
           </td>
           <td>
-            ${selectable_list(repository.writers | set([repository.owner]), True, users, groups, 'writer')}
+            ${selectable_list(repository._writers, repository.writers(), True, users, groups, 'writer')}
           </td>
           <td>
-            ${selectable_list(repository.readers | set([repository.owner]), True, users, groups, 'reader', True)}
+            ${selectable_list(repository._readers, repository.readers(), True, users, groups, 'reader', True)}
           </td>
         </tr>
       </tbody>

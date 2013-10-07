@@ -77,9 +77,9 @@ class SubversionConnector(Component):
 
         groups = set()
         for repo in repositories:
-            groups |= {name for name in repo.maintainers if name[0] == '@'}
-            groups |= {name for name in repo.writers if name[0] == '@'}
-            groups |= {name for name in repo.readers if name[0] == '@'}
+            groups |= {name for name in repo.maintainers() if name[0] == '@'}
+            groups |= {name for name in repo.writers() if name[0] == '@'}
+            groups |= {name for name in repo.readers() if name[0] == '@'}
 
         authz.add_section('groups')
         for group in groups:
@@ -89,8 +89,8 @@ class SubversionConnector(Component):
         for repo in repositories:
             section = repo.reponame + ':/'
             authz.add_section(section)
-            rw = set([repo.owner]) | repo.maintainers | repo.writers
-            r = repo.readers - rw
+            rw = repo.maintainers() | repo.writers()
+            r = repo.readers() - rw
 
             if 'authenticated' in rw:
                 if 'anonymous' in r and not 'anonymous' in rw:
