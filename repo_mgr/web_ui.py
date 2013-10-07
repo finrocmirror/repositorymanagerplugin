@@ -77,9 +77,10 @@ class RepositoryManagerModule(Component):
         if action == 'list':
             req.redirect(req.href.browser())
 
+        restrict = self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm
         data = {'action': action,
                 'restrict_dir': self.restrict_dir,
-                'restrict_forks': self.restrict_forks,
+                'restrict_forks': restrict,
                 'possible_owners': self._get_possible_owners(req),
                 'referer': req.args.get('referer', req.get_header('Referer')),
                 'unicode_to_base64': unicode_to_base64}
@@ -146,9 +147,9 @@ class RepositoryManagerModule(Component):
         rm = RepositoryManager(self.env);
         origin_name = req.args.get('local_origin', req.args.get('reponame'))
 
-        if self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm:
+        if self.restrict_forks:
             name = req.authname + '/' + origin_name
-            if rm.get_repository(name):
+            if rm.get_repository(name) and not 'REPOSITORY_ADMIN' in req.perm:
                 req.redirect(req.href.browser(name))
             req.args['local_name'] = name
 
