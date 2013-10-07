@@ -85,6 +85,8 @@ class SubversionConnector(Component):
         for group in groups:
             members = expand_user_set(self.env, [group])
             authz.set('groups', group[1:], ', '.join(sorted(members)))
+        authenticated = sorted({u[0] for u in self.env.get_known_users()})
+        authz.set('groups', 'authenticated', ', '.join(authenticated))
 
         for repo in repositories:
             section = repo.reponame + ':/'
@@ -101,10 +103,11 @@ class SubversionConnector(Component):
             def apply_user_list(users, action):
                 if not users:
                     return
-                if 'authenticated' in users:
-                    if not 'anonymous' in users:
-                        authz.set(section, 'anonymous', '')
+                if 'anonymous' in users:
                     authz.set(section, '*', action)
+                    return
+                if 'authenticated' in users:
+                    authz.set(section, '@authenticated', action)
                     return
                 for user in sorted(users):
                     authz.set(section, user, action)

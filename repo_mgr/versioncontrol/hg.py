@@ -54,9 +54,10 @@ class MercurialConnector(Component):
                 if not users:
                     hgrc.set('web', 'deny_' + action, '*')
                     return
+                if 'anonymous' in users:
+                    return
                 if 'authenticated' in users:
-                    if not 'anonymous' in users:
-                        hgrc.set('web', 'deny_' + action, 'anonymous')
+                    hgrc.set('web', 'deny_' + action, 'anonymous')
                     return
                 hgrc.set('web', 'allow_' + action, ', '.join(sorted(users)))
 
