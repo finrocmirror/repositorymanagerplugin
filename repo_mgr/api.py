@@ -217,6 +217,8 @@ class RepositoryManager(Component):
         convert_managed_repository(self.env, repo)
         with self.env.db_transaction as db:
             db("DELETE FROM repository WHERE id = %d" % repo.id)
+            db("DELETE FROM revision WHERE repos = %d" % repo.id)
+            db("DELETE FROM node_change WHERE repos = %d" % repo.id)
             self.manager.reload_repositories()
         if delete:
             shutil.rmtree(repo.directory)
