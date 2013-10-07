@@ -122,6 +122,14 @@ class RepositoryManager(Component):
             convert_managed_repository(self.env, repo)
         return repo
 
+    def get_repository_by_id(self, id, convert_to_managed=False):
+        """Retrieve a matching `Repository` for the given id."""
+        repositories = self.manager.get_all_repositories()
+        for name, info in repositories.iteritems():
+            if info['id'] == int(id):
+                return self.get_repository(name, convert_to_managed)
+        return None
+
     def get_repository_by_path(self, path):
         """Retrieve a matching `Repository` for the given path."""
         return self.manager.get_repository_by_path(path)

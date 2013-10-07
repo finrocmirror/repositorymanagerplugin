@@ -43,7 +43,7 @@ class PullRequestWorkflowProxy(Component):
             return chain.from_iterable(items)
 
         rm = RepositoryManager(self.env)
-        repo = rm.get_repository(ticket['pr_srcrepo'], True)
+        repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
@@ -74,7 +74,7 @@ class PullRequestWorkflowProxy(Component):
             return chain.from_iterable(self._filter_resolutions(req, items))
 
         rm = RepositoryManager(self.env)
-        repo = rm.get_repository(ticket['pr_srcrepo'], True)
+        repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])

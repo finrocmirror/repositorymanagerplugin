@@ -115,7 +115,7 @@ class PullrequestModule(Component):
                 repo = data.get('pr_srcrepo')
                 if not repo:
                     rm = RepositoryManager(self.env)
-                    repo = rm.get_repository(ticket['pr_srcrepo'], True)
+                    repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
                     assert repo.is_fork
 
                 srcrev = ticket['pr_srcrev']
@@ -217,10 +217,10 @@ class PullrequestModule(Component):
         errors = []
         if ticket['type'] == 'pull request':
             rm = RepositoryManager(self.env)
-            repo = rm.get_repository(ticket['pr_srcrepo'], True)
+            repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
             assert repo.is_fork
 
-            if rm.get_repository(ticket['pr_dstrepo'], True) != repo.origin:
+            if rm.get_repository_by_id(ticket['pr_dstrepo'], True) != repo.origin:
                 msg = _("Pull requests must go from a fork to its origin.")
                 errors.append((None, msg))
 

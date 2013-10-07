@@ -226,7 +226,7 @@ ${comment}</textarea>
                 <tr>
                   <th><label for="field-srcrev">From:</label></th>
                   <td class="fullrow" colspan="3">
-                    <input type="hidden" id="field-pr-srcrepo" name="field_pr_srcrepo" value="$pr_srcrepo.reponame" />
+                    <input type="hidden" id="field-pr-srcrepo" name="field_pr_srcrepo" value="$pr_srcrepo.id" />
                     <py:choose>
                       <py:when test="not ticket.exists or len(pr_srcrev_list) == 1">
                         <a title="Show in browser" href="${href.browser(pr_srcrepo.reponame, rev=pr_srcrev)}">$pr_srcrepo.reponame @ ${pr_srcrepo.display_rev(pr_srcrev)}</a>
@@ -244,7 +244,7 @@ ${comment}</textarea>
                 <tr>
                 <th>To:</th>
                   <td cass="fullrow" colspan="3">
-                    <input type="hidden" id="field-pr-dstrepo" name="field_pr_dstrepo" value="$pr_dstrepo.reponame" />
+                    <input type="hidden" id="field-pr-dstrepo" name="field_pr_dstrepo" value="$pr_dstrepo.id" />
                     <input type="hidden" id="field-pr-dstrev" name="field_pr_dstrev" value="$dstrev" />
                     <a title="Show in browser" href="${href.browser(pr_dstrepo.reponame, rev=pr_dstrev)}">$pr_dstrepo.reponame @ ${pr_dstrepo.display_rev(dstrev)}</a>
                   </td>
