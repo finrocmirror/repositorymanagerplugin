@@ -43,18 +43,17 @@ class PullRequestWorkflowProxy(Component):
             return chain.from_iterable(items)
 
         rm = RepositoryManager(self.env)
-        repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
+        repo = rm.get_repository_by_id(ticket['pr_dstrepo'], True)
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
-        maintainers = repo.maintainers()
 
         actions = []
         actions.append((4, 'leave'))
-        if req.authname in maintainers and current_status != 'closed':
+        if req.authname in repo.maintainers() and current_status != 'closed':
             actions.append((3, 'accept'))
             actions.append((2, 'reject'))
-            if not current_owner or maintainers - set([current_owner]):
+            if not current_owner or repo.maintainers() - set([current_owner]):
                 actions.append((1, 'reassign'))
             actions.append((0, 'review'))
         if current_status == 'closed':
@@ -74,7 +73,7 @@ class PullRequestWorkflowProxy(Component):
             return chain.from_iterable(self._filter_resolutions(req, items))
 
         rm = RepositoryManager(self.env)
-        repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
+        repo = rm.get_repository_by_id(ticket['pr_dstrepo'], True)
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
