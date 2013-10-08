@@ -19,6 +19,7 @@ setup(
     package_data={
         'repo_mgr': [
             'templates/*',
+            'pullrequests/templates/*',
             'htdocs/css/*'
             ]
         },
