@@ -242,9 +242,9 @@ class PullrequestModule(Component):
                 errors.append((None, msg))
 
             if ticket['owner'] == '< default >':
-                ticket['owner'] = repo.owner
+                ticket['owner'] = repo.origin.owner
             cc = set(ticket['cc'].replace(',', ' ').split())
-            cc |= repo.maintainers()
+            cc |= repo.origin.maintainers()
             cc -= set([ticket['owner'], ticket['reporter']])
             ticket['cc'] = ','.join(cc)
         return errors
