@@ -427,8 +427,9 @@ ${value}</textarea>
     </div>
 
     <br />
-    <xi:include href="diff.html"
-      py:with="changes = diff_changes"/>
+    <div id="diff">
+      <xi:include href="diff.html" py:with="changes = diff_changes"/>
+    </div>
 
   </body>
 </html>
