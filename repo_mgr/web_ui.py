@@ -147,7 +147,7 @@ class RepositoryManagerModule(Component):
         rm = RepositoryManager(self.env);
         origin_name = req.args.get('local_origin', req.args.get('reponame'))
 
-        if self.restrict_forks:
+        if self.restrict_forks and origin_name:
             name = req.authname + '/' + origin_name
             if rm.get_repository(name) and not 'REPOSITORY_ADMIN' in req.perm:
                 req.redirect(req.href.browser(name))
