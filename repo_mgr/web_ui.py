@@ -149,9 +149,10 @@ class RepositoryManagerModule(Component):
 
         if self.restrict_forks and origin_name:
             name = req.authname + '/' + origin_name
-            if rm.get_repository(name) and not 'REPOSITORY_ADMIN' in req.perm:
-                req.redirect(req.href.browser(name))
-            req.args['local_name'] = name
+            if not 'REPOSITORY_ADMIN' in req.perm:
+                if rm.get_repository(name):
+                    req.redirect(req.href.browser(name))
+                req.args['local_name'] = name
 
         local_fork = self._get_repository_data_from_request(req, 'local_')
         local_fork['origin'] = origin_name
