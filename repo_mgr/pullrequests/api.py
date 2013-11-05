@@ -89,11 +89,19 @@ class PullRequestWorkflowProxy(Component):
                 hints.append(_("The ticket will remain with no owner",
                                owner=current_owner))
         if action == 'accept':
-            hints.append(_("The request will be accepted"))
-            hints.append(_("Next status will be '%(name)s'", name='closed'))
+            if repo.has_node('', ticket['pr_srcrev']):
+                hints.append(_("The request will be accepted"))
+                hints.append(_("Next status will be '%(name)s'", name='closed'))
+            else:
+                hints.append(_("The changes must be merged into '%(repo)s' "
+                               "first", repo=repo.reponame))
         if action == 'reject':
-            hints.append(_("The request will be rejected"))
-            hints.append(_("Next status will be '%(name)s'", name='closed'))
+            if not repo.has_node('', ticket['pr_srcrev']):
+                hints.append(_("The request will be rejected"))
+                hints.append(_("Next status will be '%(name)s'", name='closed'))
+            else:
+                hints.append(_("The changes are already present in '%(repo)s'",
+                               repo=repo.reponame))
         if action == 'reassign':
             maintainers = (set([repo.owner]) | repo.maintainers())
             maintainers -= set([current_owner])
@@ -152,10 +160,6 @@ class PullRequestWorkflowProxy(Component):
             items = (controller.get_action_side_effects(req, ticket, action)
                      for controller in self.action_controllers)
             return chain.from_iterable(items)
-        # Be paranoid here, as this should only be called when
-        # action is delete...
-        if action == 'delete':
-            ticket.delete()
 
     ### Private methods
     def _filter_resolutions(self, req, items):

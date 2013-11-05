@@ -80,6 +80,31 @@ class PullrequestModule(Component):
 
     ### IRequestFilter methods
     def pre_process_request(self, req, handler):
+        """Check if accepting or rejecting a pull request is valid.
+
+        Only those requests can be accepted, which changes were already
+        merged into the destination repository.
+        Also, changes that are already present in the destination can
+        not be rejected.
+        """
+        match = re.match(r'^/ticket/(.+)$', req.path_info)
+        if match and 'action' in req.args:
+            print(req.path_info)
+            if req.args['field_type'] == 'pull request':
+                rm = RepositoryManager(self.env)
+                repo = rm.get_repository_by_id(req.args['field_pr_dstrepo'])
+                assert repo
+                rev_in_repo = repo.has_node('', req.args['field_pr_srcrev'])
+
+                if req.args['action'] == 'accept' and not rev_in_repo:
+                    add_warning(req, tag_('The changes are not merged into '
+                                          'the repository, yet. Do so first.'))
+                    req.redirect(req.href.ticket(req.args['id']) + '#top')
+                if req.args['action'] == 'reject' and rev_in_repo:
+                    add_warning(req, tag_('The changes were already merged '
+                                          'into the repository. They can not '
+                                          'be rejected that way.'))
+                    req.redirect(req.href.ticket(req.args['id']) + '#top')
         return handler
 
     def post_process_request(self, req, template, data, content_type):
@@ -97,7 +122,7 @@ class PullrequestModule(Component):
         4. Replace some templates by own ones, that have small adaptions
 
         For normal tickets just remove 'pull request' from the options
-        for the type field. 
+        for the type field.
         """
         if data and 'ticket' in data:
 
