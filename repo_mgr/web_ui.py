@@ -8,6 +8,7 @@ from trac.web.chrome import INavigationContributor, ITemplateProvider, \
                             add_ctxtnav, add_stylesheet, \
                             add_notice, add_warning
 from trac.versioncontrol.admin import RepositoryAdminPanel
+from trac.ticket.model import Ticket
 from trac.util import is_path_below, as_bool
 from trac.util.translation import _, tag_
 from trac.util.text import normalize_whitespace, \
@@ -232,6 +233,33 @@ class RepositoryManagerModule(Component):
     def _process_remove_request(self, req, data):
         """Remove an existing repository."""
         repo = self._get_checked_repository(req, req.args.get('reponame'))
+
+        open_ticket = None
+        with self.env.db_transaction as db:
+            tickets = db("""SELECT ticket FROM (
+                                SELECT src.ticket,
+                                       src.value as srcrepo,
+                                      dst.value as dstrepo
+                                FROM ticket_custom AS src JOIN
+                                     ticket_custom AS dst ON
+                                     (src.ticket = dst.ticket)
+                                WHERE src.name = 'pr_srcrepo' AND
+                                      dst.name = 'pr_dstrepo')
+                            WHERE srcrepo = %d OR dstrepo = %d
+                            """ % (repo.id, repo.id))
+            for values in tickets:
+                (id,) = values
+                ticket = Ticket(self.env, id)
+                if ticket['status'] != 'closed':
+                    open_ticket = id
+                    break
+
+        if open_ticket:
+            link = tag.a(_("pull request"), href=req.href.ticket(open_ticket))
+            add_warning(req, tag_('The repository "%(name)s can not be '
+                                  'removed as it is referenced by an open '
+                                  '%(link)s.', name=repo.reponame, link=link))
+            LoginModule(self.env)._redirect_back(req)
 
         if req.args.get('confirm'):
             RepositoryManager(self.env).remove(repo, req.args.get('delete'))

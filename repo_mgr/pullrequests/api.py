@@ -44,6 +44,7 @@ class PullRequestWorkflowProxy(Component):
 
         rm = RepositoryManager(self.env)
         repo = rm.get_repository_by_id(ticket['pr_dstrepo'], True)
+        srcrepo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
 
         current_status = ticket._old.get('status', ticket['status']) or 'new'
         current_owner = ticket._old.get('owner', ticket['owner'])
@@ -57,7 +58,8 @@ class PullRequestWorkflowProxy(Component):
                 actions.append((1, 'reassign'))
             actions.append((0, 'review'))
         if current_status == 'closed':
-            actions.append((0, 'reopen'))
+            if srcrepo and repo:
+                actions.append((0, 'reopen'))
         return actions
 
     def get_all_status(self):

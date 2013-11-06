@@ -137,25 +137,10 @@ class PullrequestModule(Component):
             if ticket['type'] == 'pull request':
                 self._filter_ticket_fields(data, True)
 
-                repo = data.get('pr_srcrepo')
-                if not repo:
-                    rm = RepositoryManager(self.env)
-                    repo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
-                    assert repo.is_fork
-
-                srcrev = ticket['pr_srcrev']
-                srcrev_list = []
-                candidate = srcrev
-                while candidate is not None:
-                    srcrev_list.append(candidate)
-                    candidate = repo.next_rev(candidate)
-
-                dstrev = repo.get_youngest_common_ancestor(srcrev)
-                data.update({'pr_srcrepo': repo,
-                             'pr_srcrev': srcrev,
-                             'pr_srcrev_list': srcrev_list,
-                             'pr_dstrepo': repo.origin,
-                             'pr_dstrev': dstrev})
+                if ticket.id:
+                    self._post_process_ticket_request(req, data)
+                else:
+                    self._post_process_newticket_request(req, data)
 
                 self._render_diff_html(req, data)
                 add_script(req, 'common/js/diff.js')
@@ -304,6 +289,43 @@ class PullrequestModule(Component):
         else:
             data['fields'] = list(fields)
 
+    def _post_process_ticket_request(self, req, data):
+        """Setup data from the existing ticket."""
+        ticket = data['ticket']
+
+        rm = RepositoryManager(self.env)
+        srcrepo = rm.get_repository_by_id(ticket['pr_srcrepo'], True)
+        dstrepo = rm.get_repository_by_id(ticket['pr_dstrepo'], True)
+        assert not (srcrepo and dstrepo) or srcrepo.origin == dstrepo
+        assert ticket['status'] == 'closed' or (srcrepo and dstrepo)
+
+        srcrev = ticket['pr_srcrev']
+        srcrev_list = []
+        candidate = srcrev
+        if ticket['status'] != 'closed':
+            while candidate is not None:
+                srcrev_list.append(candidate)
+                candidate = srcrepo.next_rev(candidate)
+
+        data.update({'pr_srcrepo': srcrepo,
+                     'pr_srcrev': srcrev,
+                     'pr_srcrev_list': srcrev_list,
+                     'pr_dstrepo': dstrepo,
+                     'pr_dstrev': ticket['pr_dstrev']})
+
+    def _post_process_newticket_request(self, req, data):
+        """Setup data from the provided source repository."""
+        repo = data.get('pr_srcrepo')
+        assert repo and repo.is_fork
+
+        srcrev = data['ticket']['pr_srcrev']
+
+        data.update({'pr_srcrepo': repo,
+                     'pr_srcrev': srcrev,
+                     'pr_srcrev_list': [],
+                     'pr_dstrepo': repo.origin,
+                     'pr_dstrev': repo.get_youngest_common_ancestor(srcrev)})
+
     def _render_diff_html(self, req, data):
         """Use Trac's rendering to show the changes in the pull request.
         
@@ -324,16 +346,21 @@ class PullrequestModule(Component):
 
         cm = ChangesetModule(self.env)
         diff_data = {}
+        repo = data['pr_srcrepo'] or data['pr_dstrepo']
+
+        if not (repo and repo.has_node('', data['pr_srcrev'])):
+            return
+
         diff_data.update({'old_path': '',
                           'old_rev': data['pr_dstrev'],
                           'new_path': '',
                           'new_rev': data['pr_srcrev'],
-                          'repos': data['pr_srcrepo'],
-                          'reponame': data['pr_srcrepo'].reponame,
+                          'repos': repo,
+                          'reponame': repo.reponame,
                           'diff': diff,
                           'wiki_format_messages': cm.wiki_format_messages})
 
-        cm._render_html(req, data['pr_srcrepo'], False, True, False, diff_data)
+        cm._render_html(req, repo, False, True, False, diff_data)
 
         for key in diff_data:
             diff_key = key
