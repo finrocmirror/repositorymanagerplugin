@@ -8,6 +8,7 @@ from trac.web.chrome import INavigationContributor, ITemplateProvider, \
                             add_ctxtnav, add_stylesheet, \
                             add_notice, add_warning
 from trac.versioncontrol.admin import RepositoryAdminPanel
+from trac.versioncontrol.svn_authz import AuthzSourcePolicy
 from trac.ticket.model import Ticket
 from trac.util import is_path_below, as_bool
 from trac.util.translation import _, tag_
@@ -400,6 +401,19 @@ class BrowserModule(Component):
     """Add navigation items to the browser."""
 
     implements(INavigationContributor, IRequestFilter)
+
+    def __init__(self):
+        """Make sure that the configured authz file is available.
+
+        AuthzSourcePolicy requires its authz file to exist. Otherwise,
+        it would not allow to see the browser until the first occurence
+        of access configuration, which is done via the browser.
+        """
+        authz_source_file = AuthzSourcePolicy(self.env).authz_file
+        if authz_source_file:
+            authz_source_path = os.path.join(self.env.path, authz_source_file)
+            if not os.path.exists(authz_source_path):
+                RepositoryManager(self.env).update_auth_files()
 
     ### INavigationContributor methods
     def get_active_navigation_item(self, req):

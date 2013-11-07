@@ -115,5 +115,6 @@ class SubversionConnector(Component):
             apply_user_list(rw, 'rw')
             apply_user_list(r, 'r')
 
+        RepositoryManager(self.env)._prepare_base_directory(authz_path)
         with open(authz_path, 'wb') as authz_file:
             authz.write(authz_file)

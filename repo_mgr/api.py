@@ -308,6 +308,7 @@ class RepositoryManager(Component):
 
                 apply_user_list(r, 'r')
 
+            self._prepare_base_directory(authz_source_path)
             with open(authz_source_path, 'wb') as authz_file:
                 authz.write(authz_file)
 
