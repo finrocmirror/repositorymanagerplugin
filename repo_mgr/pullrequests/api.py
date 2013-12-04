@@ -51,7 +51,7 @@ class PullRequestWorkflowProxy(Component):
 
         actions = []
         actions.append((4, 'leave'))
-        if req.authname in repo.maintainers() and current_status != 'closed':
+        if current_status != 'closed' and req.authname in repo.maintainers():
             actions.append((3, 'accept'))
             actions.append((2, 'reject'))
             if not current_owner or repo.maintainers() - set([current_owner]):

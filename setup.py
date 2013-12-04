@@ -26,6 +26,7 @@ setup(
     zip_safe=True,
     entry_points={
         'trac.plugins': [
+            'repo_mgr.admin = repo_mgr.admin',
             'repo_mgr.web_ui = repo_mgr.web_ui',
             'repo_mgr.pullrequests.web_ui = repo_mgr.pullrequests.web_ui',
             'repo_mgr.pullrequests.api = repo_mgr.pullrequests.api',

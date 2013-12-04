@@ -228,8 +228,8 @@ ${comment}</textarea>
                   <td class="fullrow" colspan="3">
                     <input type="hidden" id="field-pr-srcrepo" name="field_pr_srcrepo" value="$pr_srcrepo.id" />
                     <py:choose>
-                      <py:when test="not ticket.exists or len(pr_srcrev_list) == 1">
-                        <a title="Show in browser" href="${href.browser(pr_srcrepo.reponame, rev=pr_srcrev)}">$pr_srcrepo.reponame @ ${pr_srcrepo.display_rev(pr_srcrev)}</a>
+                      <py:when test="not ticket.exists or len(pr_srcrev_list) >= 1">
+                        <a title="Show in browser" href="${pr_srcrepo and href.browser(pr_srcrepo.reponame, rev=pr_srcrev) or None}">${pr_srcrepo and pr_srcrepo.reponame + "@" + pr_srcrepo.display_rev(pr_srcrev) or "Removed repository"}</a>
                         <input type="hidden" id="field-pr-srcrev" name="field_pr_srcrev" value="$pr_srcrev" />
                       </py:when>
                       <py:otherwise>
@@ -246,7 +246,7 @@ ${comment}</textarea>
                   <td cass="fullrow" colspan="3">
                     <input type="hidden" id="field-pr-dstrepo" name="field_pr_dstrepo" value="$pr_dstrepo.id" />
                     <input type="hidden" id="field-pr-dstrev" name="field_pr_dstrev" value="$pr_dstrev" />
-                    <a title="Show in browser" href="${href.browser(pr_dstrepo.reponame, rev=pr_dstrev)}">$pr_dstrepo.reponame @ ${pr_dstrepo.display_rev(dstrev)}</a>
+                    <a title="Show in browser" href="${pr_dstrepo and href.browser(pr_dstrepo.reponame, rev=pr_dstrev) or None}">${pr_dstrepo and pr_dstrepo.reponame + "@" + pr_dstrepo.display_rev(dstrev) or "Removed repository"}</a>
                   </td>
                 </tr>
                 <py:if test="only_for_admin">

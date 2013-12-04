@@ -27,10 +27,6 @@ class RepositoryManagerModule(Component):
     implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
                ITemplateProvider)
 
-    base_dir = Option('repository-manager', 'base_dir', 'repositories',
-                      doc="""The base folder in which repositories will be
-                             created.
-                             """)
     restrict_dir = BoolOption('repository-manager', 'restrict_dir', True,
                               doc="""Always use the repository name as
                                      directory name. Disables some form
@@ -177,7 +173,8 @@ class RepositoryManagerModule(Component):
         if self.restrict_forks and not 'REPOSITORY_ADMIN' in req.perm:
             restrict_modifications = repo.is_fork
 
-        base_directory = self._get_base_directory(repo.type)
+        rm = RepositoryManager(self.env)
+        base_directory = rm.get_base_directory(repo.type)
         prefix_length = len(base_directory)
         if prefix_length > 0:
             prefix_length += 1
@@ -191,7 +188,6 @@ class RepositoryManagerModule(Component):
                                                        repo.inherit_readers)
         new = self._get_repository_data_from_request(req)
 
-        rm = RepositoryManager(self.env)
         if req.args.get('modify'):
             if self._check_and_update_repository(req, new, repo):
                 rm.modify(repo, new)
@@ -210,6 +206,7 @@ class RepositoryManagerModule(Component):
                 decode = unicode_from_base64
                 roles = [(decode(role[0]), decode(role[1])) for role in roles]
                 rm.revoke_roles(repo, roles)
+                rm.update_auth_files()
                 req.redirect(req.href(req.path_info))
         elif req.args.get('cancel'):
             LoginModule(self.env)._redirect_back(req)
@@ -297,10 +294,6 @@ class RepositoryManagerModule(Component):
 
         return repository
 
-    def _get_base_directory(self, type):
-        """Get the base directory for the given repository type."""
-        return os.path.join(self.env.path, self.base_dir, type)
-
     def _create(self, req, repo, creator):
         """Check if a repository can be created and create it using the
         given creator function.
@@ -322,7 +315,8 @@ class RepositoryManagerModule(Component):
             add_warning(req, _("The directory is missing."))
             return False
 
-        base_directory = self._get_base_directory(repo['type'])
+        rm = RepositoryManager(self.env)
+        base_directory = rm.get_base_directory(repo['type'])
         directory = os.path.join(base_directory, repo['dir'])
 
         if not old_repo or old_repo.directory != directory:
@@ -341,7 +335,6 @@ class RepositoryManagerModule(Component):
                                "%(dirs)s", dirs=', '.join(prefixes)))
             return False
 
-        rm = RepositoryManager(self.env)
         if not old_repo or old_repo.reponame != repo['name']:
             if rm.get_repository(repo['name']):
                 add_warning(req, _('Repository "%(name)s" already exists',
@@ -382,6 +375,7 @@ class RepositoryManagerModule(Component):
                 subject = req.args.get(role)
                 if subject:
                     rm.add_role(repo, role, subject)
+                    rm.update_auth_files()
                     return True
                 add_warning(req, _("Please choose an option from the list."))
         return False

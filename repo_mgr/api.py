@@ -4,7 +4,7 @@ from trac.versioncontrol.svn_authz import AuthzSourcePolicy
 from trac.perm import PermissionSystem
 from trac.util import as_bool
 from trac.util.translation import _
-from trac.config import BoolOption
+from trac.config import Option, BoolOption
 
 from ConfigParser import ConfigParser
 
@@ -66,6 +66,10 @@ class RepositoryManager(Component):
     supports that, which creates instances of `ForkedRepository`.
     """
 
+    base_dir = Option('repository-manager', 'base_dir', 'repositories',
+                      doc="""The base folder in which repositories will be
+                             created.
+                             """)
     owner_as_maintainer = BoolOption('repository-manager',
                                      'owner_as_maintainer',
                                      True,
@@ -110,6 +114,18 @@ class RepositoryManager(Component):
                 result[key] = repositories[key]['name']
         return result
 
+    def get_managed_repositories(self):
+        """Return the list of existing managed repositories."""
+        repositories = self.manager.get_all_repositories()
+        result = {}
+        for key in repositories:
+            try:
+                self.get_repository(repositories[key]['name'], True)
+                result[key] = repositories[key]['name']
+            except:
+                pass
+        return result
+
     def get_repository(self, name, convert_to_managed=False):
         """Retrieve the appropriate repository for the given name.
 
@@ -133,6 +149,10 @@ class RepositoryManager(Component):
     def get_repository_by_path(self, path):
         """Retrieve a matching `Repository` for the given path."""
         return self.manager.get_repository_by_path(path)
+
+    def get_base_directory(self, type):
+        """Get the base directory for the given repository type."""
+        return os.path.join(self.env.path, self.base_dir, type)
 
     def create(self, repo):
         """Create a new empty repository.
@@ -240,10 +260,9 @@ class RepositoryManager(Component):
         setattr(repo, role_attr,
                 getattr(repo, role_attr) | set([subject]))
         self._update_roles_in_db(repo)
-        self.update_auth_files()
 
     def revoke_roles(self, repo, roles):
-        """Revoke a list or `role, subject` pairs."""
+        """Revoke a list of `role, subject` pairs."""
         convert_managed_repository(self.env, repo)
         for role, subject in roles:
             role_attr = '_' + role + 's'
@@ -252,7 +271,6 @@ class RepositoryManager(Component):
             setattr(repo, role_attr,
                     getattr(repo, role_attr) - set([subject]))
         self._update_roles_in_db(repo)
-        self.update_auth_files()
 
     def update_auth_files(self):
         """Rewrites all configured auth files for all managed
