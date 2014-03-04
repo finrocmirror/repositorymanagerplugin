@@ -384,7 +384,9 @@ class RepositoryManagerModule(Component):
         """Fill a dict with common repository data for create/fork/modify
         actions.
         """
-        directory = req.args.get(prefix + 'dir', req.args.get(prefix + 'name'))
+        directory = req.args.get(prefix + 'dir')
+        if self.restrict_dir or not directory:
+            directory = req.args.get(prefix + 'name')
         return {'name': req.args.get(prefix + 'name'),
                 'type': req.args.get(prefix + 'type'),
                 'dir': normalize_whitespace(directory),
