@@ -329,6 +329,11 @@ class RepositoryManager(Component):
             self._prepare_base_directory(authz_source_path)
             with open(authz_source_path, 'wb') as authz_file:
                 authz.write(authz_file)
+            try:
+                modes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
+                os.chmod(authz_source_path, modes)
+            except:
+                pass
 
     ### Private methods
     def _get_repository_connector(self, repo_type):

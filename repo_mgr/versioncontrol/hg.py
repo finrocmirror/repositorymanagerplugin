@@ -66,3 +66,8 @@ class MercurialConnector(Component):
 
             with open(hgrc_path, 'wb') as hgrc_file:
                 hgrc.write(hgrc_file)
+            try:
+                modes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
+                os.chmod(hgrc_path, modes)
+            except:
+                pass

@@ -118,3 +118,8 @@ class SubversionConnector(Component):
         RepositoryManager(self.env)._prepare_base_directory(authz_path)
         with open(authz_path, 'wb') as authz_file:
             authz.write(authz_file)
+        try:
+            modes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
+            os.chmod(authz_path, modes)
+        except:
+            pass
