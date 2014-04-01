@@ -227,13 +227,15 @@ class RepositoryManager(Component):
     def modify(self, repo, data):
         """Modify an existing repository."""
         convert_managed_repository(self.env, repo)
-        if repo.directory != data['dir']:
-            shutil.move(repo.directory, data['dir'])
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
                 [(data[key], repo.id, key) for key in data])
             self.manager.reload_repositories()
+        if repo.directory != data['dir']:
+            shutil.move(repo.directory, data['dir'])
+            repo = self.get_repository(data['name'])
+            repo.sync(clean=True)
         self.update_auth_files()
 
     def remove(self, repo, delete):
