@@ -42,7 +42,8 @@ class MercurialConnector(Component):
             hgrc = ConfigParser()
             hgrc.read(hgrc_path)
 
-            options = ('deny_read', 'deny_push', 'allow_read', 'allow_push')
+            options = ('deny_read', 'deny_push',
+                       'allow_read', 'allow_push', 'allow_write')
             if hgrc.has_section('web'):
                 for option in options:
                     if hgrc.has_option('web', option):
@@ -62,7 +63,10 @@ class MercurialConnector(Component):
                 hgrc.set('web', 'allow_' + action, ', '.join(sorted(users)))
 
             apply_user_list(readers, 'read')
-            apply_user_list(writers, 'push')
+            if repo.maintainers():
+                apply_user_list(writers, 'write')
+            else:
+                apply_user_list(writers, 'push')
 
             with open(hgrc_path, 'wb') as hgrc_file:
                 hgrc.write(hgrc_file)
