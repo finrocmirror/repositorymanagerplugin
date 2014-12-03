@@ -479,11 +479,13 @@ def convert_managed_repository(env, repo):
         repo.id = trac_rm.get_repository_id(repo.reponame)
         rm = RepositoryManager(env)
         with env.db_transaction as db:
-            repo.owner = db("""SELECT value FROM repository
-                               WHERE name = 'owner' AND id = %d
-                               """ % repo.id)[0][0]
-            if not repo.owner:
+            result = db("""SELECT value FROM repository
+                           WHERE name = 'owner' AND id = %d
+                           """ % repo.id)
+            if not result:
                 raise TracError(_("Not a managed repository"))
+
+            repo.owner = result[0][0]
             for role in rm.roles:
                 role_attr = '_' + role + 's'
                 setattr(repo, role_attr,
