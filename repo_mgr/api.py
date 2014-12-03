@@ -229,13 +229,14 @@ class RepositoryManager(Component):
     def modify(self, repo, data):
         """Modify an existing repository."""
         convert_managed_repository(self.env, repo)
+        if repo.directory != data['dir']:
+            shutil.move(repo.directory, data['dir'])
         with self.env.db_transaction as db:
             db.executemany(
                 "UPDATE repository SET value = %s WHERE id = %s AND name = %s",
                 [(data[key], repo.id, key) for key in data])
             self.manager.reload_repositories()
         if repo.directory != data['dir']:
-            shutil.move(repo.directory, data['dir'])
             repo = self.get_repository(data['name'])
             repo.sync(clean=True)
         self.update_auth_files()
@@ -243,17 +244,17 @@ class RepositoryManager(Component):
     def remove(self, repo, delete):
         """Remove an existing repository.
 
-        Depending on the parameter delete this method  also removes the
+        Depending on the parameter delete this method also removes the
         repository from the filesystem. This can not be undone.
         """
         convert_managed_repository(self.env, repo)
+        if delete:
+            shutil.rmtree(repo.directory)
         with self.env.db_transaction as db:
             db("DELETE FROM repository WHERE id = %d" % repo.id)
             db("DELETE FROM revision WHERE repos = %d" % repo.id)
             db("DELETE FROM node_change WHERE repos = %d" % repo.id)
-            self.manager.reload_repositories()
-        if delete:
-            shutil.rmtree(repo.directory)
+        self.manager.reload_repositories()
         self.update_auth_files()
 
     def add_role(self, repo, role, subject):
