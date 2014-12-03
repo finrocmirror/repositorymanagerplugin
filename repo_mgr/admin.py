@@ -6,6 +6,7 @@ from trac.admin import AdminCommandError, IAdminCommandProvider, get_dir_list
 from trac.versioncontrol.api import DbRepositoryProvider
 from trac.versioncontrol.api import RepositoryManager as TracRepositoryManager
 from trac.versioncontrol.admin import RepositoryAdminPanel
+from trac.util import as_bool
 from trac.util.text import printout, print_table
 from trac.util.translation import _
 
@@ -36,14 +37,17 @@ class RepositoryAdmin(Component):
         yield ('repository fork', '<repos> <type> [dir]',
                "Fork an existing managed repository",
                self._complete_create, self._do_fork)
-        yield ('repository remove_managed', '<repos>',
+        yield ('repository remove_managed', '<repos> <delete from disk>',
                """Remove a managed repository
 
                Using the built-in command `repository remove' on a
                managed repository might leave unusable entries in the db
                and will not delete the repository from the file system.
+
+               If <delete from disk> is 'true', contents are also removed
+               permanently from disk.
                """,
-               self._complete_remove_managed, self._do_remove)
+               self._complete_remove_managed, self._do_remove_managed)
         attrs = set(DbRepositoryProvider(self.env).repository_attrs)
         yield ('repository set_managed', '<repos> <key> <value>',
                """Set an attribute of a managed repository
@@ -162,8 +166,13 @@ class RepositoryAdmin(Component):
     def _do_fork(self):
         printout("fork")
 
-    def _do_remove(self):
-        printout("remove")
+    def _do_remove_managed(self, name, delete):
+        rm = RepositoryManager(self.env)
+        repository = rm.get_repository(name)
+        if not repository:
+            raise AdminCommandError(_('Repository "%(name)s" does not exists',
+                                      name=name))
+        rm.remove(repository, as_bool(delete))
 
     def _do_set(self):
         printout("set")
