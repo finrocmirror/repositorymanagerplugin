@@ -206,6 +206,8 @@ class RepositoryManager(Component):
                               "as origin."))
         repo.update({'origin_url': 'file://' + origin.directory})
 
+        self._prepare_base_directory(repo['dir'])
+
         self._get_repository_connector(repo['type']).fork(repo)
 
         self._adjust_modes(repo['dir'])
@@ -348,14 +350,16 @@ class RepositoryManager(Component):
     def _prepare_base_directory(self, directory):
         """Create the base directories and set the correct modes."""
         base = os.path.dirname(directory)
+        original_umask = os.umask(0)
         try:
-            os.makedirs(base)
-            os.chmod(base, stat.S_IRWXU | stat.S_IRWXG)
+            os.makedirs(base, stat.S_IRWXU | stat.S_IRWXG)
         except OSError, e:
             if e.errno == errno.EEXIST and os.path.isdir(base):
                 pass
             else:
                 raise
+        finally:
+            os.umask(original_umask)
 
     def _adjust_modes(self, directory):
         """Set modes 750 and 640 for directories and files."""
