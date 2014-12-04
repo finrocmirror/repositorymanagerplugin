@@ -456,4 +456,45 @@ class BrowserModule(Component):
 
         return template, data, content_type
 
+class RepositoryIndex(Component):
+    """Enhanced repository index with e.g. maintainer information."""
+
+    implements(IRequestFilter, ITemplateProvider)
+
+    ### IRequestFilter methods
+    def pre_process_request(self, req, handler):
+        return handler
+
+    def post_process_request(self, req, template, data, content_type):
+        if template == 'browser.html':
+            if data['repo'] and data['repo']['repositories']:
+                for i, values in enumerate(data['repo']['repositories']):
+                    try:
+                        convert_managed_repository(self.env, values[2])
+                    except:
+                        pass
+                data['list_maintainers'] = list_maintainers
+            template = 'repo_mgr_browser.html'
+
+        return template, data, content_type
+
+    ### ITemplateProvider methods
+    def get_templates_dirs(self):
+        from pkg_resources import resource_filename
+        return [resource_filename(__name__, 'templates')]
+
+    def get_htdocs_dirs(self):
+        from pkg_resources import resource_filename
+        return [('hw', resource_filename(__name__, 'htdocs'))]
+
     ### Private methods
+
+
+def list_maintainers(repository):
+    """Formats the list repository's maintainers for web display"""
+    try:
+        maintainers = repository.maintainers()
+        if maintainers:
+            return _("Maintainers: %(joined)s", joined=", ".join(maintainers))
+    except:
+        pass
