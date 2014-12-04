@@ -474,7 +474,6 @@ def convert_managed_repository(env, repo):
         return set()
 
     if repo.__class__ is not ManagedRepository:
-        repo.__class__ = ManagedRepository
         trac_rm = TracRepositoryManager(env)
         repo.id = trac_rm.get_repository_id(repo.reponame)
         rm = RepositoryManager(env)
@@ -485,6 +484,7 @@ def convert_managed_repository(env, repo):
             if not result:
                 raise TracError(_("Not a managed repository"))
 
+            repo.__class__ = ManagedRepository
             repo.owner = result[0][0]
             for role in rm.roles:
                 role_attr = '_' + role + 's'
