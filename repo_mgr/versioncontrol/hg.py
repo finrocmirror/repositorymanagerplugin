@@ -51,6 +51,9 @@ class MercurialConnector(Component):
             else:
                 hgrc.add_section('web')
 
+            if repo.description:
+                hgrc.set('web', 'description', repo.description)
+
             def apply_user_list(users, action):
                 if not users:
                     hgrc.set('web', 'deny_' + action, '*')

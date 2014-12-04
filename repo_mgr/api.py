@@ -220,6 +220,7 @@ class RepositoryManager(Component):
                 [(id, 'dir', repo['dir']),
                  (id, 'type', repo['type']),
                  (id, 'owner', repo['owner']),
+                 (id, 'description', origin.description),
                  (id, 'origin', origin.id),
                  (id, 'inherit_readers', True)] + roles)
             self.manager.reload_repositories()
@@ -405,6 +406,7 @@ def convert_managed_repository(env, repo):
         id = None
         owner = None
         type = None
+        description = None
         is_fork = False
         is_forkable = False
         directory = None
@@ -494,6 +496,7 @@ def convert_managed_repository(env, repo):
 
         info = trac_rm.get_all_repositories().get(repo.reponame)
         repo.type = info['type']
+        repo.description = info.get('description')
         repo.is_forkable = repo.type in rm .get_forkable_types()
         repo.directory = info['dir']
 
