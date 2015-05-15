@@ -18,6 +18,16 @@ class MercurialConnector(Component):
     def can_fork(self, type):
         return True
 
+    def can_delete_changesets(self, type):
+        return True
+
+    def can_ban_changesets(self, type):
+        try:
+            import hgban
+            return True
+        except:
+            return False
+
     def create(self, repo):
         try:
             hglib.init(repo['dir'])
@@ -30,6 +40,43 @@ class MercurialConnector(Component):
                         updaterev='null', pull=True)
         except Exception, e:
             raise TracError(_("Failed to clone repository: ") + str(e))
+
+    def delete_changeset(self, repo, rev, ban):
+        try:
+            from mercurial import ui, hg, repair
+            hg_repo = hg.repository(ui.ui(), repo.directory)
+            repair.strip(ui.ui(), hg_repo, [ hg_repo[rev].node() ], None)
+        except Exception, e:
+            raise TracError(_("Failed to strip changesets from repository: ") + str(e))
+
+        if ban:
+            try:
+                import hgban
+            except:
+                raise TracError(_("Could not import the hgban extension"))
+            hgrc_path = os.path.join(repo.directory, '.hg/hgrc')
+
+            hgrc = ConfigParser()
+            hgrc.read(hgrc_path)
+
+            if not hgrc.has_section('extensions'):
+                hgrc.add_section('extensions')
+            hgrc.set('extensions', 'hgban', '')
+
+            revsets = ''
+            if hgrc.has_section('hgban'):
+                revsets = hgrc.get('hgban', 'revsets')
+            else:
+                hgrc.add_section('hgban')
+            hgrc.set('hgban', 'revsets', revsets  + "\n" + rev)
+
+            with open(hgrc_path, 'wb') as hgrc_file:
+                hgrc.write(hgrc_file)
+                try:
+                    modes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
+                    os.chmod(hgrc_path, modes)
+                except:
+                    pass
 
     def update_auth_files(self, repositories):
         for repo in repositories:

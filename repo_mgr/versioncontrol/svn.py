@@ -43,6 +43,12 @@ class SubversionConnector(Component):
     def can_fork(self, type):
         return False
 
+    def can_delete_changesets(self, type):
+        return False
+
+    def can_ban_changesets(self, type):
+        return False
+
     def create(self, repo):
         try:
             characters = string.ascii_lowercase + string.digits

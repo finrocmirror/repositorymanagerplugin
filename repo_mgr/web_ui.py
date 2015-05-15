@@ -496,3 +496,82 @@ def list_maintainers(repository):
             return _("Maintainers: %(joined)s", joined=", ".join(maintainers))
     except:
         pass
+
+class ChangesetModule(Component):
+    """Supports deleting and banning of changesets from managed repositories"""
+
+    implements(IPermissionRequestor, IRequestFilter, IRequestHandler, ITemplateProvider)
+
+    ### IPermissionRequestor methods
+    def get_permission_actions(self):
+        return ['CHANGESET_DELETE']
+
+    ### IRequestFilter methods
+    def pre_process_request(self, req, handler):
+        return handler
+
+    def post_process_request(self, req, template, data, content_type):
+        match = re.match(r'^/changeset', req.path_info)
+        if 'CHANGESET_DELETE' in req.perm and match:
+            rev = req.args.get('new')
+            path = req.args.get('new_path')
+
+            rm = RepositoryManager(self.env)
+            if rev and path:
+                reponame, repos, path = rm.get_repository_by_path(path)
+                convert_managed_repository(self.env, repos)
+                if (path == '/' and (repos.owner == req.authname or
+                                     'REPOSITORY_ADMIN' in req.perm)
+                    and rm.can_delete_changesets(repos.type)):
+                    add_ctxtnav(req, _("Delete Changeset"),
+                                req.href.deletechangeset(rev, reponame))
+
+        return template, data, content_type
+
+    ### IRequestHandler methods
+    def match_request(self, req):
+        match = re.match(r'^/deletechangeset/([^/]+)/(.+)$', req.path_info)
+        if match:
+            rev, reponame = match.groups()
+            req.args['rev'] = rev
+            req.args['reponame'] = reponame
+            return True
+
+    def process_request(self, req):
+        req.perm.require('CHANGESET_DELETE')
+
+        rm = RepositoryManager(self.env)
+        repos = rm.get_repository(req.args['reponame'], True)
+        if not repos:
+            raise TracError(_('Repository "%(name)s" does not exist.',
+                              name=req.args['reponame']))
+
+        if not (repos.owner == req.authname or
+                'REPOSITORY_ADMIN' in req.perm):
+            message = _('You (%(user)s) are not the owner of "%(name)s"',
+                        user=req.authname, name=repos.reponame)
+            raise PermissionError(message)
+
+        if req.args.get('confirm'):
+            display_rev = repos.display_rev(req.args['rev'])
+            rm.delete_changeset(repos, req.args['rev'], req.args.get('ban'))
+            add_notice(req, _('The changeset "%(rev)s" has been removed.',
+                              rev=display_rev))
+            req.redirect(req.href.log(repos.reponame))
+        elif req.args.get('cancel'):
+            LoginModule(self.env)._redirect_back(req)
+
+        data = {'repository': repos,
+                'rev': req.args['rev'],
+                'cannot_ban': not rm.can_ban_changesets(repos.type)}
+
+        add_stylesheet(req, 'common/css/admin.css')
+        return 'changeset_delete.html', data, None
+
+    ### ITemplateProvider methods
+    def get_templates_dirs(self):
+        from pkg_resources import resource_filename
+        return [resource_filename(__name__, 'templates')]
+
+    def get_htdocs_dirs(self):
+        return []

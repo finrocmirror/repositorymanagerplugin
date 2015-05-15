@@ -1,0 +1,42 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="layout.html" />
+  <head>
+    <title>Delete Changeset</title>
+  </head>
+
+  <body>
+    <div id="content">
+
+      <h1>Delete Changeset</h1>
+
+      <form class="addnew" method="post">
+	<fieldset>
+	  <legend>Confirm deletion of changeset <a href="${href.changeset(rev, repository.reponame)}">${repository.display_rev(rev)}</a> and all its descendants from <a href="${href.browser(repository.reponame)}">$repository.reponame</a></legend>
+	  <label><input type="checkbox" name="ban" disabled="${cannot_ban or None}"/> Ban changeset from repository</label>
+	  <input type="submit" name="confirm" value="${_('Remove Changeset')}" />
+	  <input type="submit" name="cancel" value="${_('Cancel')}" />
+          <p class="help" py:choose="cannot_ban">
+            <py:when test="True">
+              Banning changesets is not supported by the used SCM or your installation.
+              Published changesets might re-enter the repository after deletion.
+            </py:when>
+            <py:otherwise>
+              Ban published changesets to keep them from re-entering your repository after deletion.
+            </py:otherwise>
+          </p>
+	</fieldset>
+      </form>
+
+      <div id="help">
+        <strong>Note:</strong> See <a href="${href.wiki('RepositoryManager')}">RepositoryManager</a>
+        for help on deleting and banning changesets.
+      </div>
+
+    </div>
+  </body>
+</html>

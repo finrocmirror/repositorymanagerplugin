@@ -42,11 +42,20 @@ class IAdministrativeRepositoryConnector(Interface):
     def can_fork(repository_type):
         """Return whether forking is supported by the connector."""
 
+    def can_delete_changesets(repository_type):
+        """Return whether deleting changesets is supported."""
+
+    def can_ban_changesets(repository_type):
+        """Return whether banning changesets is supported."""
+
     def create(repository):
         """Create a new empty repository with given attributes."""
 
     def fork(repository):
         """Fork from `origin_url` in the given dict."""
+
+    def delete_changeset(repository, revision, ban):
+        """Delete (and optionally ban) a changeset from the repository."""
 
     def update_auth_files(repositories):
         """Write auth information to e.g. authz for .hgrc files"""
@@ -103,6 +112,14 @@ class RepositoryManager(Component):
     def can_fork(self, type):
         """Return whether the given repository type can be forked."""
         return self._get_repository_connector(type).can_fork(type)
+
+    def can_delete_changesets(self, type):
+        """Return whether the given repository type can delete changesets."""
+        return self._get_repository_connector(type).can_delete_changesets(type)
+
+    def can_ban_changesets(self, type):
+        """Return whether the given repository type can ban changesets."""
+        return self._get_repository_connector(type).can_ban_changesets(type)
 
     def get_forkable_repositories(self):
         """Return a dictionary of repository information, indexed by
@@ -257,6 +274,16 @@ class RepositoryManager(Component):
             db("DELETE FROM node_change WHERE repos = %d" % repo.id)
         self.manager.reload_repositories()
         self.update_auth_files()
+
+    def delete_changeset(self, repo, rev, ban):
+        """Delete a changeset from a managed repository, if supported.
+
+        Depending on the parameter ban this method also marks the
+        changeset to be kept out of the repository. That features needs
+        special support by the used scm.
+        """
+        convert_managed_repository(self.env, repo)
+        self._get_repository_connector(repo.type).delete_changeset(repo, rev, ban)
 
     def add_role(self, repo, role, subject):
         """Add a role for the given repository."""
