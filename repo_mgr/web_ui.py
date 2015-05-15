@@ -24,7 +24,7 @@ import re
 class RepositoryManagerModule(Component):
     """The `RepositoryManager`'s user interface."""
 
-    implements(IPermissionRequestor, IRequestHandler, IRequestFilter,
+    implements(IPermissionRequestor, IRequestFilter, IRequestHandler,
                ITemplateProvider)
 
     restrict_dir = BoolOption('repository-manager', 'restrict_dir', True,
@@ -80,7 +80,6 @@ class RepositoryManagerModule(Component):
                 'restrict_dir': self.restrict_dir,
                 'restrict_forks': restrict,
                 'possible_owners': self._get_possible_owners(req),
-                'referer': req.args.get('referer', req.get_header('Referer')),
                 'unicode_to_base64': unicode_to_base64}
 
         if action == 'create':
@@ -106,8 +105,7 @@ class RepositoryManagerModule(Component):
         return [resource_filename(__name__, 'templates')]
 
     def get_htdocs_dirs(self):
-        from pkg_resources import resource_filename
-        return [('hw', resource_filename(__name__, 'htdocs'))]
+        return []
 
     ### Private methods
     def _process_create_request(self, req, data):
@@ -119,7 +117,7 @@ class RepositoryManagerModule(Component):
         """
         req.perm.require('REPOSITORY_CREATE')
 
-        rm = RepositoryManager(self.env);
+        rm = RepositoryManager(self.env)
 
         repository = self._get_repository_data_from_request(req, 'create_')
         remote_fork = self._get_repository_data_from_request(req, 'remote_')
@@ -142,7 +140,7 @@ class RepositoryManagerModule(Component):
 
     def _process_fork_request(self, req, data):
         """Fork an existing repository."""
-        rm = RepositoryManager(self.env);
+        rm = RepositoryManager(self.env)
         origin_name = req.args.get('local_origin', req.args.get('reponame'))
 
         if self.restrict_forks and origin_name:

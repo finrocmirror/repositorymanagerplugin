@@ -364,7 +364,7 @@ class RepositoryManager(Component):
             os.umask(original_umask)
 
     def _adjust_modes(self, directory):
-        """Set modes 750 and 640 for directories and files."""
+        """Set modes 770 and 660 for directories and files."""
         try:
             os.chmod(directory, stat.S_IRWXU | stat.S_IRWXG)
             fmodes = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP

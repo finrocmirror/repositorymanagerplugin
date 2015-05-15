@@ -18,9 +18,8 @@ setup(
     include_package_data=True,
     package_data={
         'repo_mgr': [
-            'templates/*',
-            'pullrequests/templates/*',
-            'htdocs/css/*'
+            'templates/*.html',
+            'pullrequests/templates/*.html',
             ]
         },
     zip_safe=True,

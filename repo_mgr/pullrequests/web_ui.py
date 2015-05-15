@@ -203,8 +203,7 @@ class PullrequestModule(Component):
         return [resource_filename(__name__, 'templates')]
 
     def get_htdocs_dirs(self):
-        from pkg_resources import resource_filename
-        return [('hw', resource_filename(__name__, 'htdocs'))]
+        return []
 
     ### ITicketManipulator methods
     def prepare_ticket(self, req, ticket, fields, actions):
